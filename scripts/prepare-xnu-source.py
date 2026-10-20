@@ -16,7 +16,7 @@ URL = f'https://api.github.com/repos/apple-oss-distributions/xnu/contents/iokit/
 
 
 def restore(entry, destination=DESTINATION, tag=TAG):
-    if entry['type'] != 'file' or not entry['name'].endswith('.h'):
+    if entry['type'] != 'file' or not (entry['name'].endswith('.h') or entry['name'].endswith('.iig')):
         return None
     name = entry.get('relative', entry['name'])
     target = destination / name
