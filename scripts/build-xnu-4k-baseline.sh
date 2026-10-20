@@ -794,6 +794,9 @@ if [ ! -f "$STUB_DIR/libLegacyDisplayProbe.a" ]; then
 fi
 KERNEL_EXTRA_ARCHIVES="${KERNEL_EXTRA_ARCHIVES:-} -Wl,-force_load,$STUB_DIR/libLegacyDisplayProbe.a"
 KERNEL_ARCHIVE_DEPENDENCIES="${KERNEL_ARCHIVE_DEPENDENCIES:-} $STUB_DIR/libLegacyDisplayProbe.a"
+EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")
+EXTRA_MAKE_ARGS+=("XNU_EXTERNAL_KERNEL_ARCHIVES=$KERNEL_ARCHIVE_DEPENDENCIES")
+echo "stub archive wired: $KERNEL_EXTRA_ARCHIVES"
 
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 V="${XNU_MAKE_V:-0}" \
   OTHER_CXXFLAGS="-include $ROOT/.cache/xnu-work/iokit/DriverKit/IORPC.h" \
