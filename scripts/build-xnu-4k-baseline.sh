@@ -26,6 +26,12 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
+# Fix: OSObject.iig.cpo needs IORPC.h; add per-file CXXFLAGS via the iokit template
+IOKIT_TPL=.cache/xnu-work/iokit/conf/Makefile.template
+if [ -f "$IOKIT_TPL" ] && ! grep -q 'OSObject.iig.cpo_CXXFLAGS_ADD' "$IOKIT_TPL"; then
+  printf '\n# per-file: mig-generated DriverKit code needs IORPC.h\nOSObject.iig.cpo_CXXFLAGS_ADD += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
+  echo "patched: OSObject.iig.cpo_CXXFLAGS_ADD += -include IORPC.h"
+fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
