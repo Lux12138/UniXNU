@@ -771,6 +771,10 @@ make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iph
     fi
     echo "=== IORPC.h exists? ==="
     ls -la .cache/xnu-work/iokit/DriverKit/IORPC.h 2>/dev/null || echo "(missing)"
+    echo "=== OSObject.iig first 8 lines ==="
+    head -8 .cache/xnu-work/iokit/DriverKit/OSObject.iig 2>/dev/null || echo "(missing)"
+    echo "=== OSObject.h first 20 lines ==="
+    head -20 build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DriverKit/OSObject.h 2>/dev/null || echo "(missing)"
     exit 1
   }
 if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$CRYPTO_BOOTSTRAP_MODE" = source ]; then
