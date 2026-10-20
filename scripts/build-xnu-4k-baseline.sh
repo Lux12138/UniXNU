@@ -26,6 +26,17 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
+# DEBUG: make LDFILELIST rules verbose so failures surface
+if [ "${UNIXNU_DEBUG_LDFILELIST:-0}" = 1 ]; then
+  T=.cache/xnu-work/bsd/conf/Makefile.template
+  if [ -f "$T" ]; then
+    cp "$T" "$T.bak"
+    sed -i '' 's/^\(\s*\)@\/\1echo "LDFILELIST: \"; \1set -x; \1@\/' "$T" 2>/dev/null || true
+    sed -i '' 's/^\s*\$(_v)for obj in/		set -x; for obj in/' "$T" 2>/dev/null || true
+    echo "=== patched LDFILELIST rule ==="
+    grep -n -A3 'LOG_LDFILELIST' "$T" | head -20
+  fi
+fi
 set +x
 # DEBUG: inspect LDFILELIST rule and bsd makefile
 if [ "${UNIXNU_DEBUG_LDFILELIST:-0}" = 1 ]; then
