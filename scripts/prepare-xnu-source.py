@@ -20,7 +20,7 @@ def restore(entry, destination=DESTINATION, tag=TAG):
         return None
     name = entry.get('relative', entry['name'])
     target = destination / name
-    if target.exists():
+    if target.exists() and not entry['name'].endswith('.iig'):
         return None
     data = urllib.request.urlopen(entry['download_url'], timeout=30).read()
     digest = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
