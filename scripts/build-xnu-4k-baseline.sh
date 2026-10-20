@@ -27,15 +27,6 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   echo "patched: $f"
 done || true
 set +x
-# pre-cached DriverKit / TrustCache headers from workflow /tmp
-if [ -d /tmp/xnu-old/iokit/DriverKit ]; then
-  mkdir -p .cache/xnu-work/iokit/DriverKit
-  cp -R /tmp/xnu-old/iokit/DriverKit/. .cache/xnu-work/iokit/DriverKit/ 2>/dev/null || true
-fi
-if [ -d /tmp/xnu-old2/EXTERNAL_HEADERS/TrustCache ]; then
-  mkdir -p .cache/xnu-work/EXTERNAL_HEADERS
-  cp -R /tmp/xnu-old2/EXTERNAL_HEADERS/TrustCache .cache/xnu-work/EXTERNAL_HEADERS/ 2>/dev/null || true
-fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
