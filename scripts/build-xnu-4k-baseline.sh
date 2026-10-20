@@ -25,6 +25,7 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done
+true
 # pre-cached DriverKit / TrustCache headers from workflow /tmp
 if [ -d /tmp/xnu-old/iokit/DriverKit ]; then
   mkdir -p .cache/xnu-work/iokit/DriverKit
