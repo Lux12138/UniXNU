@@ -74,7 +74,9 @@ command = ['xcrun', '--sdk', 'iphoneos', 'clang', '-target', 'arm64-apple-ios17.
            '-fno-vectorize', '-fno-slp-vectorize', '-mno-implicit-float',
            '-DKERNEL=1', '-DKERNEL_PRIVATE=1', '-DBUILDKERNEL=1', '-DCC_USE_ASM=0', '-DNDEBUG=1',
            '-DCC_DISABLE_RSAKEYGEN=1', '-Wno-deprecated-declarations', '-Wno-incompatible-library-redeclaration',
-           '-I' + str(include.parent), '-I' + str(framework / 'PrivateHeaders'), '-I' + str(framework / 'Headers')]
+           '-I' + str(include.parent), '-I' + str(framework / 'PrivateHeaders'), '-I' + str(framework / 'Headers'),
+           '-I' + str(ROOT / '.cache/xnu-work/osfmk'), '-I' + str(ROOT / '.cache/xnu-work/bsd'),
+           '-I' + str(ROOT / '.cache/xnu-work/libkern'), '-I' + str(ROOT / '.cache/xnu-work/external')]
 for folder in sorted({h.parent for h in SOURCE.rglob('*.h') if 'test' not in str(h.relative_to(SOURCE)).lower()}):
     command.extend(['-I', str(folder)])
 variant = '-namespaced' if args.namespace else ''
