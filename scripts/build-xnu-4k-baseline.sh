@@ -759,7 +759,20 @@ make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iph
   RC_DARWIN_KERNEL_VERSION="$XNU_DARWIN" RC_ProjectSourceVersion="$XNU_VERSION" \
   BUILD_LTO=0 BOUND_CHECKS=0 BUILD_WERROR="${XNU_BUILD_WERROR:-0}" MAKEJOBS=-j"${JOBS:-4}" \
   CFLAGS_EXTRA="$EXTRA_CFLAGS" "${EXTRA_MAKE_ARGS[@]}" \
-  OBJROOT="$ROOT/build/xnu/ios-obj" SYMROOT="$ROOT/build/xnu/ios-sym" DSTROOT="$ROOT/build/xnu/ios-dst"
+  OBJROOT="$ROOT/build/xnu/ios-obj" SYMROOT="$ROOT/build/xnu/ios-sym" DSTROOT="$ROOT/build/xnu/ios-dst" || {
+    echo "=== MAKE FAILED, dumping generated OSObject.iig.cpp ==="
+    find build/xnu -name "OSObject.iig.cpp" -print 2>/dev/null | head -3
+    F=$(find build/xnu -name "OSObject.iig.cpp" 2>/dev/null | head -1)
+    if [ -n "$F" ]; then
+      echo "--- first 40 lines of $F ---"
+      head -40 "$F"
+      echo "--- grep IORPC ---"
+      grep -n "IORPC" "$F" || echo "(no IORPC reference)"
+    fi
+    echo "=== IORPC.h exists? ==="
+    ls -la .cache/xnu-work/iokit/DriverKit/IORPC.h 2>/dev/null || echo "(missing)"
+    exit 1
+  }
 if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$CRYPTO_BOOTSTRAP_MODE" = source ]; then
   python3 scripts/seal-source-crypto-kernel.py \
     build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf
