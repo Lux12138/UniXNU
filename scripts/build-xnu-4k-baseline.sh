@@ -52,11 +52,13 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
 done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
-# Fix: mig-generated OSObject.iig.cpp calls IORPCMessageFromMach but never includes IORPC.h
-OSOBJ=.cache/xnu-work/iokit/DriverKit/OSObject.iig
-if [ -f "$OSOBJ" ] && ! grep -q 'IORPC.h' "$OSOBJ"; then
-  printf '#include <DriverKit/IORPC.h>\n' | cat - "$OSOBJ" > "$OSOBJ.tmp" && mv "$OSOBJ.tmp" "$OSOBJ"
-  echo "patched: added IORPC.h include to OSObject.iig"
+# Fix: mig-generated OSObject.iig.cpp calls IORPCMessageFromMach without including IORPC.h.
+# Patch the iokit makefile template so every iokit C++ file force-includes it.
+IOKIT_TPL=.cache/xnu-work/iokit/conf/Makefile.template
+if [ -f "$IOKIT_TPL" ] && ! grep -q 'force-include IORPC.h' "$IOKIT_TPL"; then
+  cp "$IOKIT_TPL" "$IOKIT_TPL.bak"
+  printf '\n# force-include IORPC.h for mig-generated DriverKit C++\nCFLAGS += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\nCXXFLAGS += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
+  echo "patched: iokit Makefile.template force-includes IORPC.h"
 fi
 BOOT_PROGRESS=${XNU_BOOT_PROGRESS:-0}
 if [ "$BOOT_PROGRESS" != 0 ] && [ "$BOOT_PROGRESS" != 1 ]; then
