@@ -53,7 +53,7 @@ done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
 # Fix: IORPC.h guards IORPCMessageFromMach with #ifndef KERNEL, but mig-generated
-# DriverKit C++ (kernel build) calls it. Declare it for KERNEL too.
+# DriverKit C++ in kernel builds calls it. Re-declare it after the guard closes.
 IORPCH=.cache/xnu-work/iokit/DriverKit/IORPC.h
 if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
   cp "$IORPCH" "$IORPCH.bak"
@@ -61,13 +61,18 @@ if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
 import sys
 p = sys.argv[1]
 s = open(p).read()
-decl = "\n/* UNIXNU_KERNEL_DECL */\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
-marker = "#endif /* KERNEL */"
-i = s.find(marker)
-if i >= 0:
-    s = s[:i+len(marker)] + decl + s[i+len(marker):]
-    open(p, "w").write(s)
-    print("patched IORPC.h")
+decl = "\n/* UNIXNU_KERNEL_DECL: mig-generated DriverKit C++ calls this in kernel builds */\n#if KERNEL && defined(__cplusplus)\nextern \"C\"\n#endif\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
+anchor = "IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);"
+i = s.find(anchor)
+if i < 0:
+    print("anchor missing"); sys.exit(1)
+j = s.find("#endif /* KERNEL */", i)
+if j < 0:
+    print("endif missing"); sys.exit(1)
+k = j + len("#endif /* KERNEL */")
+s = s[:k] + decl + s[k:]
+open(p, "w").write(s)
+print("patched IORPC.h at offset", k)
 PYEOF
 fi
 # Fix: mig-generated OSObject.iig.cpp references IORPCMessageFromMach; make sure the
