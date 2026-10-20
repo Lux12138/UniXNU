@@ -792,8 +792,8 @@ if [ ! -f "$STUB_DIR/libLegacyDisplayProbe.a" ]; then
   ar rcs "$STUB_DIR/libLegacyDisplayProbe.a" "$STUB_DIR/LegacyDisplayProbe.o" 2>/dev/null || true
   echo "built libLegacyDisplayProbe.a"
 fi
-KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$STUB_DIR/libLegacyDisplayProbe.a"
-KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $STUB_DIR/libLegacyDisplayProbe.a"
+KERNEL_EXTRA_ARCHIVES="${KERNEL_EXTRA_ARCHIVES:-} -Wl,-force_load,$STUB_DIR/libLegacyDisplayProbe.a"
+KERNEL_ARCHIVE_DEPENDENCIES="${KERNEL_ARCHIVE_DEPENDENCIES:-} $STUB_DIR/libLegacyDisplayProbe.a"
 
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 V="${XNU_MAKE_V:-0}" \
   OTHER_CXXFLAGS="-include $ROOT/.cache/xnu-work/iokit/DriverKit/IORPC.h" \
