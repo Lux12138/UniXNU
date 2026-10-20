@@ -25,7 +25,10 @@ def kernel_names(root, global_only=True):
         return defined_names([checkpoint], global_only)
     filelist = root / OBJ / 'link.filelist'
     if not filelist.is_file():
-        raise SystemExit('No XNU symbol names: run a kernel pass first (it writes link.filelist)')
+        # bootstrap pass stops before the final link, so link.filelist may not exist yet.
+        # Return an empty set: the archive builders then skip collision checks instead of aborting.
+        print('warning: link.filelist missing, using empty kernel symbol set', flush=True)
+        return set()
     names = defined_names([line.strip() for line in filelist.read_text().splitlines() if line.strip()], global_only)
     # The link also exports aliases (all-alias.exp: "_real _alias") that no object defines under that name.
     aliases = root / OBJ / 'all-alias.exp'
