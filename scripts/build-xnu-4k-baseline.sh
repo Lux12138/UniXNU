@@ -779,6 +779,22 @@ if not stamp.exists() or stamp.read_text() != identity:
     stamp.write_text(identity)
 PY
 EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_BOOT_PROGRESS=$BOOT_PROGRESS"
+# Stub for native_legacy_display_probe (implementation lives only in UniXNU-sheng)
+STUB_DIR="$ROOT/build/legacy-display-probe"
+mkdir -p "$STUB_DIR"
+cat > "$STUB_DIR/LegacyDisplayProbe.cpp" <<'CPPEOF'
+extern "C" void native_legacy_display_probe(void) {}
+extern "C" void native_legacy_display_late_probe(void) {}
+CPPEOF
+if [ ! -f "$STUB_DIR/libLegacyDisplayProbe.a" ]; then
+  xcrun --sdk iphoneos clang++ -target arm64-apple-ios17.0 -mkernel -ffreestanding -fno-builtin -std=gnu++2b -O2 -c \
+    -o "$STUB_DIR/LegacyDisplayProbe.o" "$STUB_DIR/LegacyDisplayProbe.cpp" 2>/dev/null || true
+  ar rcs "$STUB_DIR/libLegacyDisplayProbe.a" "$STUB_DIR/LegacyDisplayProbe.o" 2>/dev/null || true
+  echo "built libLegacyDisplayProbe.a"
+fi
+KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$STUB_DIR/libLegacyDisplayProbe.a"
+KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $STUB_DIR/libLegacyDisplayProbe.a"
+
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 V="${XNU_MAKE_V:-0}" \
   OTHER_CXXFLAGS="-include $ROOT/.cache/xnu-work/iokit/DriverKit/IORPC.h" \
   MACHINE_CONFIGS=BCM2837 KERNEL_CONFIGS=DEVELOPMENT \
