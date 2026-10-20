@@ -20,6 +20,11 @@ fi
 if [ ! -d .cache/xnu-work/.git ]; then
   git clone --shared refer/xnu .cache/xnu-work
 fi
+# Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
+grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' --include='*.template' --include='*.xcconfig' 2>/dev/null | while read -r f; do
+  sed -i '' 's/-mach_msg2//g' "$f"
+  echo "patched: $f"
+done
 # pre-cached DriverKit / TrustCache headers from workflow /tmp
 if [ -d /tmp/xnu-old/iokit/DriverKit ]; then
   mkdir -p .cache/xnu-work/iokit/DriverKit
