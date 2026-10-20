@@ -52,6 +52,13 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
 done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
+# Fix: mig-generated OSObject.iig.cpp references IORPCMessageFromMach; make sure the
+# generated header chain can see it by force-including IORPC.h into OSObject.iig itself.
+OSOBJ=.cache/xnu-work/iokit/DriverKit/OSObject.iig
+if [ -f "$OSOBJ" ] && ! grep -q 'DriverKit/IORPC.h' "$OSOBJ"; then
+  printf '#include <DriverKit/IORPC.h>\n' | cat - "$OSOBJ" > "$OSOBJ.tmp" && mv "$OSOBJ.tmp" "$OSOBJ"
+  echo "patched: prepended IORPC.h to OSObject.iig"
+fi
 
 BOOT_PROGRESS=${XNU_BOOT_PROGRESS:-0}
 if [ "$BOOT_PROGRESS" != 0 ] && [ "$BOOT_PROGRESS" != 1 ]; then
