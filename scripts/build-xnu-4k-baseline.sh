@@ -52,14 +52,7 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
 done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
-# Fix: mig-generated OSObject.iig.cpp calls IORPCMessageFromMach without including IORPC.h.
-# Patch the iokit makefile template so every iokit C++ file force-includes it.
-IOKIT_TPL=.cache/xnu-work/iokit/conf/Makefile.template
-if [ -f "$IOKIT_TPL" ] && ! grep -q 'force-include IORPC.h' "$IOKIT_TPL"; then
-  cp "$IOKIT_TPL" "$IOKIT_TPL.bak"
-  printf '\n# force-include IORPC.h for mig-generated DriverKit C++\nCFLAGS += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\nCXXFLAGS += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
-  echo "patched: iokit Makefile.template force-includes IORPC.h"
-fi
+
 BOOT_PROGRESS=${XNU_BOOT_PROGRESS:-0}
 if [ "$BOOT_PROGRESS" != 0 ] && [ "$BOOT_PROGRESS" != 1 ]; then
   echo 'XNU_BOOT_PROGRESS must be 0 or 1' >&2
@@ -757,6 +750,7 @@ if not stamp.exists() or stamp.read_text() != identity:
 PY
 EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_BOOT_PROGRESS=$BOOT_PROGRESS"
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 V="${XNU_MAKE_V:-0}" \
+  OTHER_CXXFLAGS="-include $ROOT/.cache/xnu-work/iokit/DriverKit/IORPC.h" \
   MACHINE_CONFIGS=BCM2837 KERNEL_CONFIGS=DEVELOPMENT \
   ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG=arm64 LARGE_MEMORY_DEFINE=-UARM_LARGE_MEMORY \
   ARM64_LINK_ADDR=0xfffffff007004000 ARM64_PLKSEG_ADDR=0xfffffff004004000 \
