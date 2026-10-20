@@ -28,8 +28,8 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
 done || true
 # Fix: OSObject.iig.cpo needs IORPC.h; add per-file CXXFLAGS via the iokit template
 IOKIT_TPL=.cache/xnu-work/iokit/conf/Makefile.template
-if [ -f "$IOKIT_TPL" ] && ! grep -q 'OSObject.iig.cpo_CXXFLAGS_ADD' "$IOKIT_TPL"; then
-  printf '\n# per-file: mig-generated DriverKit code needs IORPC.h\nOSObject.iig.cpo_CXXFLAGS_ADD += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
+if [ -f "$IOKIT_TPL" ] && ! grep -q 'OSObject.iig.cpo_CXXWARNFLAGS_ADD' "$IOKIT_TPL"; then
+  printf '\n# per-file: mig-generated DriverKit code needs IORPC.h\nOSObject.iig.cpo_CXXWARNFLAGS_ADD += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
   echo "patched: OSObject.iig.cpo_CXXFLAGS_ADD += -include IORPC.h"
 fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
