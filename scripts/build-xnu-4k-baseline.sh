@@ -26,16 +26,6 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
-# DEBUG: make LDFILELIST verbose
-if [ "${UNIXNU_DEBUG_LDFILELIST:-0}" = 1 ]; then
-  T=.cache/xnu-work/bsd/conf/Makefile.template
-  if [ -f "$T" ]; then
-    cp "$T" "$T.bak"
-    sed -i '' 's/@$(LOG_LDFILELIST)/$(LOG_LDFILELIST) set -x/' "$T" 2>/dev/null || true
-    echo "=== patched LDFILELIST ==="
-    grep -n -B1 -A4 'LOG_LDFILELIST' "$T" | head -24
-  fi
-fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
