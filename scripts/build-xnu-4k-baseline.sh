@@ -26,24 +26,6 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
-# Fix: IORPC.h guards IORPCMessageFromMach with #ifndef KERNEL, but mig-generated
-# DriverKit C++ (kernel build) calls it. Declare it for KERNEL too.
-IORPCH=.cache/xnu-work/iokit/DriverKit/IORPC.h
-if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
-  cp "$IORPCH" "$IORPCH.bak"
-  python3 - "$IORPCH" <<'PYEOF'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-decl = "\n/* UNIXNU_KERNEL_DECL */\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
-marker = "#endif /* KERNEL */"
-i = s.find(marker)
-if i >= 0:
-    s = s[:i+len(marker)] + decl + s[i+len(marker):]
-    open(p, "w").write(s)
-    print("patched IORPC.h")
-PYEOF
-fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
@@ -70,6 +52,24 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
 done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
+# Fix: IORPC.h guards IORPCMessageFromMach with #ifndef KERNEL, but mig-generated
+# DriverKit C++ (kernel build) calls it. Declare it for KERNEL too.
+IORPCH=.cache/xnu-work/iokit/DriverKit/IORPC.h
+if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
+  cp "$IORPCH" "$IORPCH.bak"
+  python3 - "$IORPCH" <<'PYEOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+decl = "\n/* UNIXNU_KERNEL_DECL */\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
+marker = "#endif /* KERNEL */"
+i = s.find(marker)
+if i >= 0:
+    s = s[:i+len(marker)] + decl + s[i+len(marker):]
+    open(p, "w").write(s)
+    print("patched IORPC.h")
+PYEOF
+fi
 # Fix: mig-generated OSObject.iig.cpp references IORPCMessageFromMach; make sure the
 # generated header chain can see it by force-including IORPC.h into OSObject.iig itself.
 OSOBJ=.cache/xnu-work/iokit/DriverKit/OSObject.iig
