@@ -26,6 +26,12 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
+# Fix: mig-generated OSObject.iig.cpp calls IORPCMessageFromMach but never includes IORPC.h
+OSOBJ=.cache/xnu-work/iokit/DriverKit/OSObject.iig
+if [ -f "$OSOBJ" ] && ! grep -q 'IORPC.h' "$OSOBJ"; then
+  printf '#include <DriverKit/IORPC.h>\n' | cat - "$OSOBJ" > "$OSOBJ.tmp" && mv "$OSOBJ.tmp" "$OSOBJ"
+  echo "patched: added IORPC.h include to OSObject.iig"
+fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
