@@ -26,11 +26,23 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   sed -i '' 's/-mach_msg2//g' "$f"
   echo "patched: $f"
 done || true
-# Fix: OSObject.iig.cpo needs IORPC.h; add per-file CXXFLAGS via the iokit template
-IOKIT_TPL=.cache/xnu-work/iokit/conf/Makefile.template
-if [ -f "$IOKIT_TPL" ] && ! grep -q 'OSObject.iig.cpo_CXXWARNFLAGS_ADD' "$IOKIT_TPL"; then
-  printf '\n# per-file: mig-generated DriverKit code needs IORPC.h\nOSObject.iig.cpo_CXXWARNFLAGS_ADD += -include $(SRCROOT)/iokit/DriverKit/IORPC.h\n' >> "$IOKIT_TPL"
-  echo "patched: OSObject.iig.cpo_CXXFLAGS_ADD += -include IORPC.h"
+# Fix: IORPC.h guards IORPCMessageFromMach with #ifndef KERNEL, but mig-generated
+# DriverKit C++ (kernel build) calls it. Declare it for KERNEL too.
+IORPCH=.cache/xnu-work/iokit/DriverKit/IORPC.h
+if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
+  cp "$IORPCH" "$IORPCH.bak"
+  python3 - "$IORPCH" <<'PYEOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+decl = "\n/* UNIXNU_KERNEL_DECL */\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
+marker = "#endif /* KERNEL */"
+i = s.find(marker)
+if i >= 0:
+    s = s[:i+len(marker)] + decl + s[i+len(marker):]
+    open(p, "w").write(s)
+    print("patched IORPC.h")
+PYEOF
 fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
