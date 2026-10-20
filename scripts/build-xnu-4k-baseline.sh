@@ -61,7 +61,7 @@ if [ -f "$IORPCH" ] && ! grep -q "UNIXNU_KERNEL_DECL" "$IORPCH"; then
 import sys
 p = sys.argv[1]
 s = open(p).read()
-decl = "\n/* UNIXNU_KERNEL_DECL: mig-generated DriverKit C++ calls this in kernel builds */\n#if KERNEL && defined(__cplusplus)\nextern \"C\"\n#endif\n#if KERNEL\nIORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);\n#endif\n"
+decl = "\n/* UNIXNU_KERNEL_DECL: mig-generated DriverKit C++ calls this; kernel has no user-space impl */\n#if KERNEL\nstatic inline IORPCMessage * IORPCMessageFromMach(IORPCMessageMach * msg, bool reply) { (void)reply; return (IORPCMessage *)msg; }\n#endif\n"
 anchor = "IORPCMessageFromMach(IORPCMessageMach * msg, bool reply);"
 i = s.find(anchor)
 if i < 0:
