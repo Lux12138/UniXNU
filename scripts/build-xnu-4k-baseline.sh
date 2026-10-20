@@ -27,6 +27,15 @@ grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' 
   echo "patched: $f"
 done || true
 set +x
+# DEBUG: inspect LDFILELIST rule and bsd makefile
+if [ "${UNIXNU_DEBUG_LDFILELIST:-0}" = 1 ]; then
+  echo "=== LDFILELIST rule definitions ==="
+  grep -rn 'LDFILELIST' .cache/xnu-work/makedefs .cache/xnu-work/bsd --include='Makefile*' --include='*.mk' 2>/dev/null | head -20
+  echo "=== bsd Makefile first 60 lines ==="
+  head -60 .cache/xnu-work/bsd/Makefile 2>/dev/null
+  echo "=== makedefs files ==="
+  ls .cache/xnu-work/makedefs/
+fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
