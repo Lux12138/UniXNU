@@ -807,6 +807,9 @@ mkdir -p "$STUB_DIR"
 cat > "$STUB_DIR/LegacyDisplayProbe.cpp" <<'CPPEOF'
 extern "C" void native_legacy_display_probe(void) {}
 extern "C" void native_legacy_display_late_probe(void) {}
+// Weak observer used by NativeUfs window reads; Apple ld treats the weak ref as
+// strong under -new_linker + force_load, so provide an empty strong definition.
+extern "C" void boot_progress_poll(void) {}
 CPPEOF
 if [ ! -f "$STUB_DIR/libLegacyDisplayProbe.a" ]; then
   xcrun --sdk iphoneos clang++ -target arm64-apple-ios17.0 -mkernel -ffreestanding -fno-builtin -std=gnu++2b -O2 -c \
