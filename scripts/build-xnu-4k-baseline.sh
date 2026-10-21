@@ -221,14 +221,15 @@ static int max_hit(void)
  * a fixed checkpoint id. */
 void nabu_mark_show(int n)
 {
-  /* n is the subsystem being started. The digit shows how many entries of that
-   * subsystem have already been dispatched, so the value on screen names the
-   * exact entry that faulted instead of only its subsystem. */
+  /* Two readouts, because one digit is not enough: a subsystem can hold hundreds
+   * of entries (ZALLOC has 767), so the subsystem id alone cannot name the entry.
+   * Left cell = subsystem, right cell = how many of its entries already returned. */
   static int last_sys = -1, within = 0;
   if (n != last_sys) { last_sys = n; within = 0; }
   within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, 132, within, 20);
+  draw_number(32, 132, n, 18);
+  draw_number(220, 132, within, 18);
 }
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
@@ -241,7 +242,7 @@ static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, 0, g_w, 260, 0xFF000000);
+  fill(0, 0, g_w, 280, 0xFF000000);
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
