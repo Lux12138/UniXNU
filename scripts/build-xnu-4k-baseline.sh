@@ -384,6 +384,10 @@ ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # type that was registered twice (that panic is the only one in this function).
 ko=ins_body_start(ko, r'^ipc_kobject_register_startup\(ipc_kobject_ops_t ops\)\n\{\n',
                   ['nabu_mark_val((int)ops->iko_op_type);'], 'kobject register')
+# Bisect inside the call: if block 60 ever appears, the function did return at
+# least once, so the fault is not in the store itself.
+ko=ins_after_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops;',
+                ['NABU_MARK(60);'], 'kobject register returned')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 
 st=io.open(stp,encoding='utf-8').read()
