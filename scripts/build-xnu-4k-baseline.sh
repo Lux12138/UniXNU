@@ -408,6 +408,23 @@ io.open(pep,'w',encoding='utf-8',newline='').write(pe)
 
 kop=sys.argv[5]
 ko=io.open(kop,encoding='utf-8').read()
+# The mig descriptors generated for this build carry no reply size for some mach_vm
+# routines (mach_vm_allocate is the first one hit), and mig_init turns that into a
+# panic. Fall back to the subsystem's advertised max reply size so the boot can
+# continue; the value is conservative, not exact.
+_old_panic = 'panic("kroutine must have precise size %d %d", mig_e[i]->start, j);'
+_new_fallback = ('/* UNIXNU: mig lost this descriptor reply size; use the */\n'
+                 '\t\t\t\t\t/* subsystem maximum instead of aborting the boot. */\n'
+                 '\t\t\t\t\tmig_buckets[pos].kreply_size = mig_e[i]->maxsize;\n'
+                 '\t\t\t\t\tmig_buckets[pos].kreply_desc_cnt =\n'
+                 '\t\t\t\t\t    mig_e[i]->kroutine[j].reply_descr_count;')
+if _old_panic in ko:
+    ko = ko.replace(_old_panic, _new_fallback, 1)
+    print('  mig: kroutine size panic replaced with maxsize fallback')
+else:
+    print('  mig: WARN kroutine panic anchor not found')
+io.open(kop,'w',encoding='utf-8',newline='').write(ko)
+ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
 # type that was registered twice (that panic is the only one in this function).
