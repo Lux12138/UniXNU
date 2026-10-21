@@ -196,6 +196,9 @@ static void draw_digit(unsigned int x0, unsigned int y0, int d, unsigned int s)
 }
 static void draw_number(unsigned int x0, unsigned int y0, int value, unsigned int s)
 {
+  /* Clear the whole two-digit cell first: without this a smaller value leaves the
+   * previous tens digit behind and "4" reads as "54". */
+  fill(x0, y0, 7 * s, 5 * s, 0xFF000000);
   if (value < 0) { value = 0; }
   if (value > 99) { value = 99; }
   if (value >= 10) { draw_digit(x0, y0, value / 10, s); }
@@ -216,13 +219,13 @@ static int max_hit(void)
 void nabu_mark_show(int n)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, 120, n, 16);
+  draw_number(32, 132, n, 20);
 }
 static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, 0, g_w, 232, 0xFF000000);
+  fill(0, 0, g_w, 260, 0xFF000000);
   g_slot = 0;
   for (n = 1; n <= NABU_MAX_MARK && g_slot < 24; n++) {
     if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
@@ -230,7 +233,7 @@ static void draw_all(void)
     g_slot++;
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
-  draw_number(32, 120, max_hit(), 16);
+  draw_number(32, 132, max_hit(), 20);
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
