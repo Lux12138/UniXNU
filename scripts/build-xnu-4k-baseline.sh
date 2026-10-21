@@ -43,7 +43,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show)\([^\n]*\);\n','',s,count=0,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show|val)\([^\n]*\);\n','',s,count=0,flags=re.M)
     for n in range(1,65):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -78,6 +78,8 @@ if len(sys.argv) > 4:
     rw(sys.argv[4],st_clean)
 if len(sys.argv) > 5:
     rw(sys.argv[5],st_clean)
+if len(sys.argv) > 6:
+    rw(sys.argv[6],st_clean)
 MKU
 fi
 # --- end nabu pre-clean ---
@@ -111,6 +113,7 @@ void nabu_mark_rebind(const unsigned long *video);
 /* Map the video aperture ourselves once the VM is up and replay what we have. */
 void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h);
 void nabu_mark_show(int n);
+void nabu_mark_val(int v);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -227,6 +230,13 @@ void nabu_mark_show(int n)
   if (g_fb == NULL) { return; }
   draw_number(32, 132, within, 20);
 }
+/* Draw a value with no bookkeeping: used where the number is data, not a
+ * checkpoint (e.g. the kobject type currently being registered). */
+void nabu_mark_val(int v)
+{
+  if (g_fb == NULL) { return; }
+  draw_number(32, 132, v, 20);
+}
 static void draw_all(void)
 {
   int n;
@@ -272,7 +282,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -366,6 +376,15 @@ if '#include "../../osfmk/arm/nabu_early_mark.h"' not in pe:
 pe=ins_body_start(pe, r'^PE_init_iokit\(void\)\n\{\n', ['NABU_MARK(10);'], 'PE_init_iokit entry')
 pe=ins_after_in(pe, r'^([ \t]*)PE_init_printf\(TRUE\);', ['NABU_MARK(13);'], 'PE_init_printf TRUE')
 io.open(pep,'w',encoding='utf-8',newline='').write(pe)
+
+kop=sys.argv[5]
+ko=io.open(kop,encoding='utf-8').read()
+ko=add_include(ko, '#include <pexpert/pexpert.h>')
+# Show the kobject type being registered: the value on screen when it dies is the
+# type that was registered twice (that panic is the only one in this function).
+ko=ins_body_start(ko, r'^ipc_kobject_register_startup\(ipc_kobject_ops_t ops\)\n\{\n',
+                  ['nabu_mark_val((int)ops->iko_op_type);'], 'kobject register')
+io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 
 st=io.open(stp,encoding='utf-8').read()
 st=add_include(st, '#include <pexpert/pexpert.h>')
