@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_init\(args->Video\);\n[ \t]*NABU_MARK\(1\);\n','',s,count=1,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_init\([^\n]*\);\n[ \t]*NABU_MARK\(1\);\n','',s,count=1,flags=re.M)
     for n in (2,3,4):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -86,7 +86,10 @@ done
 # Editing either before the loop breaks their apply context.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.h <<'MKH'
-void nabu_mark_init(const unsigned long long *video);
+/* Take boot_args.Video as an opaque unsigned long word stream: this XNU declares
+ * it as struct Boot_Video, older ones as unsigned long long[6]. Reading words
+ * keeps this file independent of either declaration. */
+void nabu_mark_init(const unsigned long *video);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -94,24 +97,51 @@ MKH
 #include "nabu_early_mark.h"
 #include <stddef.h>
 static volatile unsigned int *g_fb = NULL;
-static unsigned long long g_row = 0, g_px = 0, g_w = 0, g_h = 0;
+static unsigned long g_px = 0;
+static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
 static void fill(unsigned int x0, unsigned int y0, unsigned int w, unsigned int h, unsigned int c)
 {
   unsigned int x, y, xe = x0 + w, ye = y0 + h;
+  if (g_fb == NULL) { return; }
   if (xe > g_w) { xe = g_w; }
   if (ye > g_h) { ye = g_h; }
-  for (y = y0; y < ye; y++) { for (x = x0; x < xe; x++) { g_fb[(unsigned long long)y * g_px + x] = c; } }
+  for (y = y0; y < ye; y++) { for (x = x0; x < xe; x++) { g_fb[(unsigned long)y * g_px + x] = c; } }
 }
-void nabu_mark_init(const unsigned long long *v)
+static int sane(unsigned long row, unsigned long w, unsigned long h)
 {
-  g_fb = NULL; g_row = 0; g_px = 0; g_w = 0; g_h = 0; g_slot = 0;
-  if (v[0] == 0 || v[1] == 0 || v[2] == 0 || v[3] == 0 || v[4] != 32) { return; }
-  if (v[2] > 8192 || v[3] > 8192) { return; }
+  return row >= 4 && row <= 65536 && w >= 1 && w <= 8192 && h >= 1 && h <= 8192;
+}
+void nabu_mark_init(const unsigned long *v)
+{
+  unsigned long row, w, h;
+  int fallback = 0;
+  g_fb = NULL; g_px = 0; g_w = 0; g_h = 0; g_slot = 0;
+  if (v == NULL || v[0] == 0) { return; }          /* no framebuffer: give up */
+  /* struct Boot_Video order: base, display, rowBytes, width, height, depth */
+  row = v[2]; w = v[3]; h = v[4];
+  if (!sane(row, w, h)) {
+    /* legacy boot_args.Video array order: base, rowBytes, width, height, ... */
+    row = v[1]; w = v[2]; h = v[3];
+    fallback = 1;
+    if (!sane(row, w, h)) {
+      /* Geometry is unusable, but the base is writable-looking: mark a 1px
+       * probe so "framebuffer NOT mapped" stays distinguishable from
+       * "framebuffer mapped but geometry garbage". */
+      g_fb = (volatile unsigned int *)(unsigned long)v[0];
+      g_px = 4096; g_w = 4096; g_h = 4096;
+      fill(0, 0, 16, 16, 0xFFFF0000);
+      g_fb = NULL;
+      return;
+    }
+  }
   g_fb = (volatile unsigned int *)(unsigned long)v[0];
-  g_row = v[1]; g_px = v[1] / 4;
-  g_w = (unsigned int)v[2]; g_h = (unsigned int)v[3];
+  g_px = row / 4;
+  g_w = (unsigned int)w; g_h = (unsigned int)h;
   fill(0, 0, g_w, 112, 0xFF000000);
+  /* fallback layout (or a display/depth that is not 32bpp) shows up as a red
+   * block at the far end of the strip, so a mis-ordered boot_args is visible. */
+  if (fallback || (v[5] & 0xFF) != 32) { fill(32 + 7 * 64, 32, 48, 48, 0xFFFF0000); }
 }
 void nabu_mark(int n)
 {
@@ -144,7 +174,7 @@ if 'NABU_MARK(1)' not in s:
     m1=re.search(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);.*$',s,re.M)
     if m1:
         ind=m1.group(1)
-        s=s[:m1.start()]+ind+'nabu_mark_init(args->Video);\n'+ind+'NABU_MARK(1);\n'+s[m1.start():]
+        s=s[:m1.start()]+ind+'nabu_mark_init((const unsigned long *)&args->Video);\n'+ind+'NABU_MARK(1);\n'+s[m1.start():]
     else:
         print('  WARN: mark1 anchor missing (PE_init_platform)')
 if 'NABU_MARK(2)' not in s:
