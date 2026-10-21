@@ -238,31 +238,31 @@ void nabu_mark_show(int n)
   if (n != last_sys) { last_sys = n; within = 0; }
   within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, 132, n, 18);
-  draw_number(220, 132, within, 18);
+  draw_number(32, (g_h > 900 ? g_h - 320 : 132), n, 18);
+  draw_number(220, (g_h > 900 ? g_h - 320 : 132), within, 18);
 }
 /* Four values at once. One flash/photo cycle should answer several questions, so
  * every probe site can dump a small tuple instead of a single number. */
 void nabu_mark_quad(int a, int b, int c, int d)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, 132, a, 18);
-  draw_number(220, 132, b, 18);
-  draw_number(32, 300, c, 18);
-  draw_number(220, 300, d, 18);
+  draw_number(32, (g_h > 900 ? g_h - 380 : 132), a, 18);
+  draw_number(220, (g_h > 900 ? g_h - 380 : 132), b, 18);
+  draw_number(32, (g_h > 900 ? g_h - 260 : 300), c, 18);
+  draw_number(220, (g_h > 900 ? g_h - 260 : 300), d, 18);
 }
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
 void nabu_mark_val(int v)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, 132, v, 20);
+  draw_number(32, (g_h > 900 ? g_h - 320 : 132), v, 20);
 }
 static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, 0, g_w, 420, 0xFF000000);
+  fill(0, g_h > 900 ? g_h - 420 : 0, g_w, 420, 0xFF000000);
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
@@ -282,12 +282,12 @@ static void draw_all(void)
     }
     for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
       if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
-      fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_palette[(n - 1) & 7]);
+      fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 400 : 32), 48, 48, g_palette[(n - 1) & 7]);
       g_slot++;
     }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
-  draw_number(32, 132, max_hit(), 20);
+  draw_number(32, (g_h > 900 ? g_h - 320 : 132), max_hit(), 20);
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
