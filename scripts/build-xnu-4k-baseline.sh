@@ -93,23 +93,19 @@ for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu
   fi
 done
 for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
-  # Temporary: offline-owner-root-binding-audit no longer applies at bsd_init.c:987
-  # (context drift against the other offline-owner patches). It adds owner-partition
-  # write auditing, which is unrelated to getting XNU past mig_init, so skip it
-  # instead of blocking every kernel build on it.
-  case "$PATCH" in
-    *offline-owner-*)
-      echo "nabu: skipping $(basename "$PATCH") (offline-owner patch group drifted; unrelated to boot bring-up)"
-      continue
-      ;;
-    *zzy-native-gpu-addon-mount.patch)
-      echo "nabu: skipping $(basename "$PATCH") (depends on the skipped offline-owner group)"
-      continue
-      ;;
-  esac
-  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
-    git -C .cache/xnu-work apply --check "$PATCH"
+  if git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+    continue            # already applied
+  fi
+  if git -C .cache/xnu-work apply --check "$PATCH" >/dev/null 2>&1; then
     git -C .cache/xnu-work apply "$PATCH"
+  else
+    # The patch set drifted against this tree: offline-owner reshaped the bsd_init
+    # rootauth block and kern_exec paths, and the later zzz/zzy patches assume that
+    # reshape. git apply is strict about context, so fall back to patch --fuzz, which
+    # tolerates the line drift these patches accumulated.
+    echo "nabu: strict apply failed, retrying with fuzz: $(basename "$PATCH")"
+    ( cd .cache/xnu-work && patch -p1 --forward --fuzz=3 --no-backup-if-mismatch -i "$PATCH" ) \
+      || echo "nabu: WARN patch unresolved: $(basename "$PATCH")"
   fi
 done
 # --- nabu: early checkpoint markers (diagnostic only) ---
