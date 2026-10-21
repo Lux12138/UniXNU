@@ -14,14 +14,22 @@ if [ ! -d refer/xnu/.git ]; then
   git clone --depth 1 --branch "$XNU_TAG" https://github.com/apple-oss-distributions/xnu.git refer/xnu
 
 fi
+if [ "$(git -C refer/xnu rev-parse HEAD)" != "$XNU_COMMIT" ]; then
+  echo 'error: unexpected XNU reference revision' >&2
+  exit 1
+fi
+if [ ! -d .cache/xnu-work/.git ]; then
+  git clone --shared refer/xnu .cache/xnu-work
+fi
+
 # --- nabu: early checkpoint markers (diagnostic only) ---
-if [ -d refer/xnu/osfmk/arm ]; then
-  cat > refer/xnu/osfmk/arm/nabu_early_mark.h <<'MKH'
+if [ -d .cache/xnu-work/osfmk/arm ]; then
+  cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.h <<'MKH'
 void nabu_mark_init(const unsigned long long *video);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
-  cat > refer/xnu/osfmk/arm/nabu_early_mark.c <<'MKC'
+  cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.c <<'MKC'
 #include "nabu_early_mark.h"
 #include <stddef.h>
 static volatile unsigned int *g_fb = NULL;
@@ -52,9 +60,9 @@ void nabu_mark(int n)
   g_slot++;
 }
 MKC
-  grep -q nabu_early_mark refer/xnu/osfmk/conf/files.arm64 || \
-    printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> refer/xnu/osfmk/conf/files.arm64
-  python3 - refer/xnu/osfmk/arm/arm_init.c <<'MKP'
+  grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
+    printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c <<'MKP'
 import io,sys
 p=sys.argv[1]
 s=io.open(p,encoding='utf-8').read()
@@ -73,13 +81,6 @@ print('  marks inserted')
 MKP
 fi
 # --- end nabu markers ---
-if [ "$(git -C refer/xnu rev-parse HEAD)" != "$XNU_COMMIT" ]; then
-  echo 'error: unexpected XNU reference revision' >&2
-  exit 1
-fi
-if [ ! -d .cache/xnu-work/.git ]; then
-  git clone --shared refer/xnu .cache/xnu-work
-fi
 # Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
 set -x
 grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' --include='*.template' --include='*.xcconfig' 2>/dev/null | while read -r f; do
