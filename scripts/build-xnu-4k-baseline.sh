@@ -43,7 +43,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show|val|quad)\([^\n]*\);|nabu_abort_hold\n','',s,count=0,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show|val|quad)\([^\n]*\);\n','',s,count=0,flags=re.M)
     for n in range(1,65):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -98,17 +98,6 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
     git -C .cache/xnu-work apply "$PATCH"
   fi
 done
-# source-machine-layer.patch adds amcc_rorgn_{ppl,ppl_amcc,ppl_ctrr3,common}.c to
-# osfmk/conf/files.arm64, but those sources do not exist in xnu-10063.141.1 -- they come
-# from a later tree. With them listed, the build dies in LDFILELIST with a bare
-# "Error 2" and no diagnostic. They are optional PPL/AMCC helpers, so drop the rows.
-if [ -f .cache/xnu-work/osfmk/conf/files.arm64 ]; then
-  if grep -q 'amcc_rorgn' .cache/xnu-work/osfmk/conf/files.arm64; then
-    echo "nabu: removing amcc_rorgn entries that reference non-existent sources"
-    grep -v 'amcc_rorgn' .cache/xnu-work/osfmk/conf/files.arm64 > .cache/xnu-work/osfmk/conf/files.arm64.tmp
-    mv .cache/xnu-work/osfmk/conf/files.arm64.tmp .cache/xnu-work/osfmk/conf/files.arm64
-  fi
-fi
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
@@ -322,7 +311,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -372,10 +361,10 @@ s = ins_before_in(s, r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_M
 s = ins_after_in(s, r'^([ \t]*)arm_vm_init\(xmaxmem,[ \t]*args\);',
       ['nabu_mark_map(args->Video.v_baseAddr, args->Video.v_rowBytes, args->Video.v_width, args->Video.v_height);',
        'NABU_MARK(6);',
-       # Console as early as it can work. vcattach() is otherwise only reached from
-       # PE_init_iokit(), which runs after the mach-IPC round -- precisely the region
-       # that stays invisible. The kernel pmap exists by now, so this maps the
-       # framebuffer and every later kprintf, panic text included, reaches the panel.
+       # Console as early as it can work: vcattach() is otherwise only reached from
+       # PE_init_iokit(), which runs after the mach-IPC round -- exactly the region that
+       # stays invisible. The kernel pmap exists by now, so this maps the framebuffer and
+       # every later kprintf, panic text included, reaches the panel.
        'PE_init_printf(TRUE); /* UNIXNU: early screen console */'], 'arm_vm_init')
 s = ins_before_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
 s = ins_after_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
@@ -467,29 +456,6 @@ for _old, _new in (
     else:
         print('  WARN hardening anchor not found')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
-
-# Exception-vector hold: every synchronous exception enters sleh_synchronous_sp1 with
-# esr and far already decoded by hardware. A kernel abort gets its trap data painted
-# and then spins, so the panel keeps the scene instead of losing it on reboot. Only
-# abort classes are trapped; SVC/BRK/MSR traps must keep flowing.
-slc=sys.argv[6]
-sl=io.open(slc,encoding='utf-8').read()
-if 'nabu_abort_hold' not in sl:
-    sl=add_include(sl, '#include <pexpert/pexpert.h>')
-    _hold = ('\t/* nabu_abort_hold: kernel abort -> paint ESR/FAR and stop here. */\n'
-             '\t{\n'
-             '\t\tuint32_t _ec = (esr >> 26) & 0x3F;\n'
-             '\t\tif (_ec == 0x24 || _ec == 0x25 || _ec == 0x20 || _ec == 0x21) {\n'
-             '\t\t\tnabu_mark_quad((int)_ec,\n'
-             '\t\t\t    (int)((far >> 12) & 0xFF),\n'
-             '\t\t\t    (int)((far >> 20) & 0xFF),\n'
-             '\t\t\t    (int)((far >> 28) & 0xFF));\n'
-             '\t\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
-             '\t\t}\n'
-             '\t}\n')
-    sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
-                        [_hold], 'sleh abort hold')
-    io.open(slc,'w',encoding='utf-8',newline='').write(sl)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
@@ -633,10 +599,11 @@ out = Path('build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837')
 stamp = out / '.boot-progress-mode'
 identity = mode + ':' + (hashlib.sha256(Path('build/boot-progress/libBootProgress.a').read_bytes()).hexdigest() if mode == '1' else 'disabled')
 if not stamp.exists() or stamp.read_text() != identity:
-    # Do NOT unlink compiled objects here. LDFILELIST (run near the end of the build)
-    # requires every object to exist, and make can decide an object is up to date from
-    # its dependency cache even after the file was removed -- which made the link file
-    # list stage fail with a bare "Error 2" and no diagnostics.
+    for directory, names in [('osfmk', ['arm_init','startup','video_console','serial_console','sleh']),
+                             ('bsd', ['bsd_init','kern_exec','kern_exit']), ('pexpert', ['pe_kprintf'])]:
+        for name in names:
+            (out / directory / 'DEVELOPMENT' / (name + '.o')).unlink(missing_ok=True)
+    (out / 'mach.development.bcm2837.unstripped.noctf').unlink(missing_ok=True)
     out.mkdir(parents=True, exist_ok=True)
     stamp.write_text(identity)
 PY
@@ -1087,14 +1054,9 @@ else
   EXTRA_MAKE_ARGS+=("platform_tests.o_CFLAGS_ADD=")
 fi
 if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ]; then
-  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_SOURCE_CORECRYPTO14=1"
-fi
-# The bootstrap pass of a fresh tree runs BEFORE the archive builders, so the
-# corecrypto archive it would link does not exist yet and the link fails. It only has
-# to leave compile records and link.filelist behind, so skip the archives for it.
-if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "${XNU_BOOTSTRAP:-0}" = 0 ]; then
   CRYPTO_ARCHIVE=$ROOT/build/corecrypto-2023/libcorecrypto_kernel_noasm-namespaced.a
   test -f "$CRYPTO_ARCHIVE"
+  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_SOURCE_CORECRYPTO14=1"
   KERNEL_EXTRA_ARCHIVES="-L$KERNEL_SDKROOT/usr/local/lib/kernel -lfirehose_kernel $CRYPTO_ARCHIVE"
   KERNEL_ARCHIVE_DEPENDENCIES=$CRYPTO_ARCHIVE
   if [ "$ADRENO_FIRMWARE_PROBE" = 1 ]; then
