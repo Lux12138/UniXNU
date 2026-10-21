@@ -53,8 +53,8 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_init\([^\n]*\);\n[ \t]*NABU_MARK\(1\);\n','',s,count=1,flags=re.M)
-    for n in (2,3,4):
+    s=re.sub(r'^[ \t]*nabu_mark_init\([^\n]*\);\n','',s,count=1,flags=re.M)
+    for n in (1,2,3,4,5):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
 def conff(s):
@@ -170,30 +170,43 @@ if '#include <arm/nabu_early_mark.h>' not in s:
             print('  note: include appended after the last #include line')
         else:
             print('  WARN: include anchor missing (consistent_debug.h)')
-if 'NABU_MARK(1)' not in s:
-    m1=re.search(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);.*$',s,re.M)
-    if m1:
-        ind=m1.group(1)
-        s=s[:m1.start()]+ind+'nabu_mark_init((const unsigned long *)&args->Video);\n'+ind+'NABU_MARK(1);\n'+s[m1.start():]
-    else:
-        print('  WARN: mark1 anchor missing (PE_init_platform)')
-if 'NABU_MARK(2)' not in s:
-    m2=re.search(r'^([ \t]*)PE_create_console\(\);',s,re.M)
-    if m2:
-        ind=m2.group(1)
-        s=(s[:m2.start()]+ind+'NABU_MARK(2);\n'+s[m2.start():m2.end()]+
-           '\n'+ind+'NABU_MARK(3);'+s[m2.end():])
-    else:
-        print('  WARN: mark2 anchor missing (PE_create_console)')
-if 'NABU_MARK(4)' not in s:
-    m4=re.search(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);',s,re.M)
-    if m4:
-        s=s[:m4.end()]+'\n'+m4.group(1)+'NABU_MARK(4);'+s[m4.end():]
-    else:
-        print('  WARN: mark4 anchor missing (PE_init_platform TRUE)')
+def ind_of(m):
+    return m.group(1)
+def ins_before(pat, lines, label):
+    global s
+    if lines[0] in s:
+        return
+    m = re.search(pat, s, re.M)
+    if not m:
+        print('  WARN: mark anchor missing (%s)' % label)
+        return
+    ind = m.group(1)
+    s = s[:m.start()] + ''.join(ind + l + '\n' for l in lines) + s[m.start():]
+def ins_after(pat, lines, label):
+    global s
+    if lines[-1] in s:
+        return
+    m = re.search(pat, s, re.M)
+    if not m:
+        print('  WARN: mark anchor missing (%s)' % label)
+        return
+    ind = m.group(1)
+    # m ends at the last character of the line; skip its newline before inserting
+    s = s[:m.end() + 1] + ''.join(ind + l + '\n' for l in lines) + s[m.end() + 1:]
+# MARK1 sits before the very first statement of arm_init: everything from here on
+# (JOP rebase/sign, cpu_data_init) runs before PE_init_platform.
+ins_before(r'^([ \t]*)arm_setup_pre_sign\(\);',
+           ['nabu_mark_init((const unsigned long *)&args->Video);', 'NABU_MARK(1);'],
+           'arm_init entry')
+ins_before(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
+ins_before(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
+ins_after(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
+ins_after(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'],
+          'PE_init_platform TRUE')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
-print('  marks inserted: MARK1=%s MARK2=%s MARK3=%s MARK4=%s' % (
-    'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s, 'NABU_MARK(4)' in s))
+print('  marks inserted: MARK1=%s MARK2=%s MARK3=%s MARK4=%s MARK5=%s' % (
+    'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s,
+    'NABU_MARK(4)' in s, 'NABU_MARK(5)' in s))
 MKP
 fi
 # --- end nabu markers ---
