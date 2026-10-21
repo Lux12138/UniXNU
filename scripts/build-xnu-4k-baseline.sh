@@ -22,7 +22,68 @@ if [ ! -d .cache/xnu-work/.git ]; then
   git clone --shared refer/xnu .cache/xnu-work
 fi
 
+# Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
+set -x
+grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' --include='*.template' --include='*.xcconfig' 2>/dev/null | while read -r f; do
+  sed -i '' 's/-mach_msg2//g' "$f"
+  echo "patched: $f"
+done || true
+if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
+  if [ ! -d refer/AvailabilityVersions/.git ]; then
+    git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
+  fi
+  mkdir -p .cache/fakeroot
+  make -C refer/AvailabilityVersions install -j"${JOBS:-4}" \
+    OBJROOT="$ROOT/build/availability" SYMROOT="$ROOT/build/availability" \
+    DSTROOT="$ROOT/.cache/fakeroot" CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
+fi
+# --- nabu: undo a previous marker injection before patches are (re)applied ---
+# The injection below edits osfmk/arm/arm_init.c and osfmk/conf/files.arm64, the same
+# files native-4k-user-abi / zzz-boot-progress / source-machine-layer patch. On a reused
+# work tree those edits must be removed first or `git apply --check` fails.
+if [ -d .cache/xnu-work/osfmk/arm ]; then
+  rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 <<'MKU'
+import io,re,sys
+def rw(p,f):
+    s=io.open(p,encoding='utf-8').read()
+    n=f(s)
+    if n!=s:
+        io.open(p,'w',encoding='utf-8',newline='').write(n)
+        print('  nabu pre-clean: reverted '+p)
+def arm(s):
+    s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_init\(args->Video\);\n[ \t]*NABU_MARK\(1\);\n','',s,count=1,flags=re.M)
+    for n in (2,3,4):
+        s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
+    return s
+def conff(s):
+    return ''.join(l for l in s.splitlines(True) if 'nabu_early_mark.c' not in l)
+rw(sys.argv[1],arm)
+rw(sys.argv[2],conff)
+MKU
+fi
+# --- end nabu pre-clean ---
+# The optional observation hooks overlap existing root/exec patch context.
+# Remove them first so earlier independent patches retain their idempotent checks.
+# The same holds for the boot-time GPU addon mount (zzy), which edits the owner Data mount function inside the systemos patch.
+# Reverse newest first; the loop below re-applies them in name order.
+for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu/zzy-native-gpu-addon-mount.patch"; do
+  if git -C .cache/xnu-work apply --reverse --check "$LATE_PATCH" >/dev/null 2>&1; then
+    git -C .cache/xnu-work apply --reverse "$LATE_PATCH"
+  fi
+done
+for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
+  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+    git -C .cache/xnu-work apply --check "$PATCH"
+    git -C .cache/xnu-work apply "$PATCH"
+  fi
+done
 # --- nabu: early checkpoint markers (diagnostic only) ---
+# Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
+# patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
+# patches/xnu/source-machine-layer.patch edits osfmk/conf/files.arm64.
+# Editing either before the loop breaks their apply context.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.h <<'MKH'
 void nabu_mark_init(const unsigned long long *video);
@@ -63,54 +124,49 @@ MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
   python3 - .cache/xnu-work/osfmk/arm/arm_init.c <<'MKP'
-import io,sys
+import io,re,sys
 p=sys.argv[1]
 s=io.open(p,encoding='utf-8').read()
 if '#include <arm/nabu_early_mark.h>' not in s:
-    s=s.replace('#include <pexpert/arm/consistent_debug.h>','#include <pexpert/arm/consistent_debug.h>\n#include <arm/nabu_early_mark.h>',1)
+    h='#include <pexpert/arm/consistent_debug.h>'
+    if h in s:
+        s=s.replace(h,h+'\n#include <arm/nabu_early_mark.h>',1)
+    else:
+        last=None
+        for m in re.finditer(r'^#include [<"][^\n]*$',s,re.M):
+            last=m
+        if last:
+            s=s[:last.end()]+'\n#include <arm/nabu_early_mark.h>'+s[last.end():]
+            print('  note: include appended after the last #include line')
+        else:
+            print('  WARN: include anchor missing (consistent_debug.h)')
 if 'NABU_MARK(1)' not in s:
-    a='\tPE_init_platform(FALSE, args); /* Get platform expert set up */'
-    assert a in s, 'mark1 anchor'
-    s=s.replace(a,'\tnabu_mark_init(args->Video);\n\tNABU_MARK(1);\n'+a,1)
+    m1=re.search(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);.*$',s,re.M)
+    if m1:
+        ind=m1.group(1)
+        s=s[:m1.start()]+ind+'nabu_mark_init(args->Video);\n'+ind+'NABU_MARK(1);\n'+s[m1.start():]
+    else:
+        print('  WARN: mark1 anchor missing (PE_init_platform)')
 if 'NABU_MARK(2)' not in s:
-    a='\tPE_create_console();'
-    assert a in s, 'mark2 anchor'
-    s=s.replace(a,'\tNABU_MARK(2);\n'+a+'\n\tNABU_MARK(3);',1)
+    m2=re.search(r'^([ \t]*)PE_create_console\(\);',s,re.M)
+    if m2:
+        ind=m2.group(1)
+        s=(s[:m2.start()]+ind+'NABU_MARK(2);\n'+s[m2.start():m2.end()]+
+           '\n'+ind+'NABU_MARK(3);'+s[m2.end():])
+    else:
+        print('  WARN: mark2 anchor missing (PE_create_console)')
+if 'NABU_MARK(4)' not in s:
+    m4=re.search(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);',s,re.M)
+    if m4:
+        s=s[:m4.end()]+'\n'+m4.group(1)+'NABU_MARK(4);'+s[m4.end():]
+    else:
+        print('  WARN: mark4 anchor missing (PE_init_platform TRUE)')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
-print('  marks inserted')
+print('  marks inserted: MARK1=%s MARK2=%s MARK3=%s MARK4=%s' % (
+    'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s, 'NABU_MARK(4)' in s))
 MKP
 fi
 # --- end nabu markers ---
-# Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
-set -x
-grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' --include='*.template' --include='*.xcconfig' 2>/dev/null | while read -r f; do
-  sed -i '' 's/-mach_msg2//g' "$f"
-  echo "patched: $f"
-done || true
-if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
-  if [ ! -d refer/AvailabilityVersions/.git ]; then
-    git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
-  fi
-  mkdir -p .cache/fakeroot
-  make -C refer/AvailabilityVersions install -j"${JOBS:-4}" \
-    OBJROOT="$ROOT/build/availability" SYMROOT="$ROOT/build/availability" \
-    DSTROOT="$ROOT/.cache/fakeroot" CMAKE="$(command -v cmake)" NINJA="$(command -v ninja)"
-fi
-# The optional observation hooks overlap existing root/exec patch context.
-# Remove them first so earlier independent patches retain their idempotent checks.
-# The same holds for the boot-time GPU addon mount (zzy), which edits the owner Data mount function inside the systemos patch.
-# Reverse newest first; the loop below re-applies them in name order.
-for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu/zzy-native-gpu-addon-mount.patch"; do
-  if git -C .cache/xnu-work apply --reverse --check "$LATE_PATCH" >/dev/null 2>&1; then
-    git -C .cache/xnu-work apply --reverse "$LATE_PATCH"
-  fi
-done
-for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
-  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
-    git -C .cache/xnu-work apply --check "$PATCH"
-    git -C .cache/xnu-work apply "$PATCH"
-  fi
-done
 export XNU_AVAILABILITY_PL=$ROOT/.cache/fakeroot/usr/local/libexec/availability.pl
 python3 scripts/prepare-xnu-source.py
 # Fix: IORPC.h guards IORPCMessageFromMach with #ifndef KERNEL, but mig-generated
