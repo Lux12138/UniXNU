@@ -621,6 +621,12 @@ fi
     test -f "$UFS_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$UFS_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $UFS_ARCHIVE"
+    # nabu: NativeUfsBlock derives from IOBlockStorageDevice (IOStorageFamily kext, not
+    # built into the kernel), and references verified-root / boot-progress symbols.
+    # Those resolve during prelink, where IOStorageFamily is merged from the original
+    # kernelcache (board.toml [kernel.prelink] roots). Let the make-stage link accept
+    # them as undefined instead of failing.
+    EXTRA_MAKE_ARGS+=("LDFLAGS_KERNEL_DEVELOPMENT=-Wl,-undefined,dynamic_lookup")
   fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
