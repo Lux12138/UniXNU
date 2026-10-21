@@ -218,8 +218,14 @@ static int max_hit(void)
  * a fixed checkpoint id. */
 void nabu_mark_show(int n)
 {
+  /* n is the subsystem being started. The digit shows how many entries of that
+   * subsystem have already been dispatched, so the value on screen names the
+   * exact entry that faulted instead of only its subsystem. */
+  static int last_sys = -1, within = 0;
+  if (n != last_sys) { last_sys = n; within = 0; }
+  within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, 132, n, 20);
+  draw_number(32, 132, within, 20);
 }
 static void draw_all(void)
 {
