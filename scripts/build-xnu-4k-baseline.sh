@@ -434,6 +434,22 @@ if _old_printf in ko:
     print('  mig: trailing diagnostics printf removed')
 else:
     print('  mig: WARN trailing printf anchor not found')
+# mig_init stores into mig_buckets and register_startup stores into
+# ipc_kobject_ops_array; both are SECURITY_READ_ONLY_LATE, i.e. __DATA_CONST, which
+# this kernel has already locked read-only by the time the mach-IPC round runs. Every
+# store faults, which is why the counter never leaves 0 and why "31 registrations
+# succeeded" never showed up. Drop the hardening for these two tables.
+for _old, _new in (
+        ('static SECURITY_READ_ONLY_LATE(mig_hash_t) mig_buckets[MAX_MIG_ENTRIES];',
+         'static mig_hash_t mig_buckets[MAX_MIG_ENTRIES];'),
+        ('static struct ipc_kobject_ops __security_const_late\n    ipc_kobject_ops_array[IKOT_MAX_TYPE];',
+         'static struct ipc_kobject_ops\n    ipc_kobject_ops_array[IKOT_MAX_TYPE];'),
+):
+    if _old in ko:
+        ko = ko.replace(_old, _new, 1)
+        print('  writable: %s' % _new.split('[')[0].strip()[-30:])
+    else:
+        print('  WARN hardening anchor not found')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
