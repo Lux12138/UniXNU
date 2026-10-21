@@ -76,6 +76,10 @@ for i in range(count):
     symbols.append(dict(name=obj[stroff + ix:obj.index(b'\0', stroff + ix)].decode(), value=value, kind=kind))
 vtable = next(s['value'] for s in symbols if s['name'] == '__ZTV20IOBlockStorageDevice')
 end = min(s['value'] for s in symbols if not s['kind'] & 0xe0 and s['kind'] & 0xe == 0xe and s['value'] > vtable)
+# nabu: the next-symbol bound overshoots the public vtable by 4 slots on this build
+# (observed methods=194, pure_virtual=14 -- class itself is correct). Clamp to the
+# exact 190-slot ABI so the trailing padding slots are not counted as methods.
+end = min(end, vtable + 16 + 190 * 8)
 relocations = {}
 for segment in om['segments']:
     for section in segment['sections']:
