@@ -419,7 +419,7 @@ for _num, _pat, _lbl in (
     # index i is in scope there). mig_e has ~30 elements, so one cell is enough.
     (76, r'^([ \t]*)panic\("kroutine must have precise size', 'mig subsystem index'),
 ):
-    _arg = 'nabu_mark_val((int)i);' if _num == 76 else 'nabu_mark_val(%d);' % _num
+    _arg = 'nabu_mark_val((int)j);' if _num == 76 else 'nabu_mark_val(%d);' % _num
     ko = ins_before_in(ko, _pat, [_arg], _lbl)
 
 # 81 immediately before the store, 60 immediately after it: the pair says whether
