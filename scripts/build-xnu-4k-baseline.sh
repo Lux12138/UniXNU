@@ -93,6 +93,16 @@ for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu
   fi
 done
 for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
+  # Temporary: offline-owner-root-binding-audit no longer applies at bsd_init.c:987
+  # (context drift against the other offline-owner patches). It adds owner-partition
+  # write auditing, which is unrelated to getting XNU past mig_init, so skip it
+  # instead of blocking every kernel build on it.
+  case "$PATCH" in
+    *offline-owner-root-binding-audit.patch)
+      echo "nabu: skipping $(basename "$PATCH") (context drift, unrelated to boot bring-up)"
+      continue
+      ;;
+  esac
   if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
     git -C .cache/xnu-work apply --check "$PATCH"
     git -C .cache/xnu-work apply "$PATCH"
