@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show|val)\([^\n]*\);\n','',s,count=0,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show|val|quad)\([^\n]*\);\n','',s,count=0,flags=re.M)
     for n in range(1,65):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -114,6 +114,7 @@ void nabu_mark_rebind(const unsigned long *video);
 void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h);
 void nabu_mark_show(int n);
 void nabu_mark_val(int v);
+void nabu_mark_quad(int a, int b, int c, int d);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -231,6 +232,16 @@ void nabu_mark_show(int n)
   draw_number(32, 132, n, 18);
   draw_number(220, 132, within, 18);
 }
+/* Four values at once. One flash/photo cycle should answer several questions, so
+ * every probe site can dump a small tuple instead of a single number. */
+void nabu_mark_quad(int a, int b, int c, int d)
+{
+  if (g_fb == NULL) { return; }
+  draw_number(32, 132, a, 18);
+  draw_number(220, 132, b, 18);
+  draw_number(32, 300, c, 18);
+  draw_number(220, 300, d, 18);
+}
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
 void nabu_mark_val(int v)
@@ -242,7 +253,7 @@ static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, 0, g_w, 280, 0xFF000000);
+  fill(0, 0, g_w, 420, 0xFF000000);
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
@@ -415,12 +426,14 @@ for _num, _pat, _lbl in (
     (73, r'^([ \t]*)panic\("multiple entries with the same msgh_id"\);', 'mig duplicate id'),
     (74, r'^([ \t]*)panic\("the mig dispatch table is too small"\);', 'mig table too small'),
     (75, r'^([ \t]*)panic\("kroutine must have precise size', 'mig kroutine size'),
-    # Before the kroutine panic, show which mig_e[] entry is malformed (the loop
-    # index i is in scope there). mig_e has ~30 elements, so one cell is enough.
-    (76, r'^([ \t]*)panic\("kroutine must have precise size', 'mig subsystem index'),
 ):
-    _arg = 'nabu_mark_val((int)j);' if _num == 76 else 'nabu_mark_val(%d);' % _num
-    ko = ins_before_in(ko, _pat, [_arg], _lbl)
+    ko = ins_before_in(ko, _pat, ['nabu_mark_val(%d);' % _num], _lbl)
+# One quad on the kroutine panic: i, j, msgid, and the stub address low bits.
+# Together they name the exact routine without another build.
+ko = ins_before_in(ko, r'^([ \t]*)panic\("kroutine must have precise size',
+                   ['nabu_mark_quad((int)i, (int)j, (int)((mig_e[i]->start + j) % 100),'
+                    ' (int)((((unsigned long)mig_e[i]->kroutine[j].kstub_routine) >> 4) & 0x3F));'],
+                   'mig kroutine quad')
 
 # 81 immediately before the store, 60 immediately after it: the pair says whether
 # the fault is the store itself or something after it returned.
