@@ -1087,9 +1087,14 @@ else
   EXTRA_MAKE_ARGS+=("platform_tests.o_CFLAGS_ADD=")
 fi
 if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ]; then
+  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_SOURCE_CORECRYPTO14=1"
+fi
+# The bootstrap pass of a fresh tree runs BEFORE the archive builders, so the
+# corecrypto archive it would link does not exist yet and the link fails. It only has
+# to leave compile records and link.filelist behind, so skip the archives for it.
+if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "${XNU_BOOTSTRAP:-0}" = 0 ]; then
   CRYPTO_ARCHIVE=$ROOT/build/corecrypto-2023/libcorecrypto_kernel_noasm-namespaced.a
   test -f "$CRYPTO_ARCHIVE"
-  EXTRA_CFLAGS="$EXTRA_CFLAGS -DXNU_SOURCE_CORECRYPTO14=1"
   KERNEL_EXTRA_ARCHIVES="-L$KERNEL_SDKROOT/usr/local/lib/kernel -lfirehose_kernel $CRYPTO_ARCHIVE"
   KERNEL_ARCHIVE_DEPENDENCIES=$CRYPTO_ARCHIVE
   if [ "$ADRENO_FIRMWARE_PROBE" = 1 ]; then
