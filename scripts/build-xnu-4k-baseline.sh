@@ -392,6 +392,10 @@ ko=ins_after_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops
 # i.e. the ops array was never zeroed rather than a genuine double registration.
 ko=ins_before_in(ko, r'^([ \t]*)panic\("trying to register kobject',
                  ['nabu_mark_val(77);'], 'kobject duplicate panic')
+# 81 immediately before the store, 60 immediately after it: the pair says whether
+# the fault is the store itself or something after it returned.
+ko=ins_before_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops;',
+                 ['nabu_mark_val(81);'], 'before kobject store')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 
 st=io.open(stp,encoding='utf-8').read()
