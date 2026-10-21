@@ -21,6 +21,15 @@ fi
 if [ ! -d .cache/xnu-work/.git ]; then
   git clone --shared refer/xnu .cache/xnu-work
 fi
+# Always start from the pristine tag. `unixnu tree` may already have created this work
+# tree WITH patches/xnu/*.patch applied; the loop below is not idempotent, so a second
+# application fails on bsd_init.c and the tree is left half-patched -- which is what made
+# the build fail with "patch does not apply" while "Assemble tree" reported success.
+if [ -d .cache/xnu-work/.git ]; then
+  git -C .cache/xnu-work reset --hard HEAD >/dev/null 2>&1 || true
+  git -C .cache/xnu-work clean -fdq >/dev/null 2>&1 || true
+  echo "nabu: xnu-work reset to $(git -C .cache/xnu-work rev-parse --short HEAD) before patching"
+fi
 
 # Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
 set -x
