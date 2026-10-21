@@ -423,6 +423,11 @@ st=ins_before_in(st, r'^([ \t]*)while \(cur < startup_entries_end && cur->subsys
                  ['NABU_MARK(50);'], 'startup loop entry')
 st=ins_after_in(st, r'^([ \t]*)cur->func\(cur->arg\);',
                 ['nabu_mark_show((int)cur->subsystem);'], 'startup entry done')
+# Identify the entry itself: bits 6..11 of the function address, 0..63. Matches the
+# static table so the value on screen names the function that faulted.
+st=ins_before_in(st, r'^([ \t]*)cur->func\(cur->arg\);',
+                 ['nabu_mark_val((int)((((unsigned long)cur->func) >> 6) & 0x3F));'],
+                 'startup entry id')
 # The digits said 26 (mac_policy_init) but 27 (PMAP_ACTIVATE_KERNEL) never came.
 # Split the ten lines in between: 45 = mac_policy_init returned, 46 = mach_ipc done.
 st=ins_after_in(st, r'^([ \t]*)mac_policy_init\(\);', ['NABU_MARK(45);'], 'mac_policy_init done')
