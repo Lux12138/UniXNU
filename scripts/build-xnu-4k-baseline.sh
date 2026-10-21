@@ -605,6 +605,16 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ]; then
     test -f "$ARMCPU_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$ARMCPU_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $ARMCPU_ARCHIVE"
+
+# nabu: replace the driver's SM8550 GccUfs.h with the SM8150 board constants.
+# NativeUfs reads only; the offsets differ between the two SoCs and must not be mixed.
+NABU_GCC_UFS="$ROOT/scripts/GccUfs-nabu.h"
+DRV_GCC_UFS="$ROOT/drivers/NativeUfs/GccUfs.h"
+if [ -f "$NABU_GCC_UFS" ] && [ -f "$DRV_GCC_UFS" ]; then
+  cp "$DRV_GCC_UFS" "$DRV_GCC_UFS.sm8550.orig"
+  cp "$NABU_GCC_UFS" "$DRV_GCC_UFS"
+  echo "nabu: installed SM8150 GccUfs.h over driver default (SM8550)"
+fi
   fi
   if [ "${XNU_NATIVE_UFS:-0}" = 1 ]; then
     UFS_ARCHIVE=$ROOT/build/native-ufs/libNativeUfs.a
