@@ -54,7 +54,7 @@ def rw(p,f):
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
     s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map)\([^\n]*\);\n','',s,count=0,flags=re.M)
-    for n in range(1,21):
+    for n in range(1,65):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
 def conff(s):
@@ -62,12 +62,12 @@ def conff(s):
 def vc_clean(t):
     t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
     t=re.sub(r'\t/\* nabu: vcattach just mapped the framebuffer.*?\n\t\}\n','',t,count=1,flags=re.S)
-    for n in range(1,21):
+    for n in range(1,65):
         t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 def st_clean(t):
     t=re.sub(r'^#include (?:"\.\./\.\./osfmk/arm/nabu_early_mark\.h"|<arm/nabu_early_mark\.h>)\n','',t,count=1,flags=re.M)
-    for n in range(1,21):
+    for n in range(1,65):
         t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 rw(sys.argv[1],arm)
@@ -124,8 +124,8 @@ static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
 static void draw_all(void);   /* defined below; nabu_mark keeps the screen current */
-static unsigned int g_hits = 0;   /* bit n-1 set == checkpoint n was reached */
-#define NABU_MAX_MARK 20
+static unsigned long long g_hits = 0; /* bit n-1 set == checkpoint n was reached */
+#define NABU_MAX_MARK 64
 static const unsigned int g_palette[8] = {
   0xFFFFFFFF, 0xFFFFFF00, 0xFF00FFFF, 0xFF00FF00,
   0xFFFF00FF, 0xFFFF8000, 0xFF0000FF, 0xFFFF0000
@@ -178,7 +178,7 @@ void nabu_mark_init(const unsigned long *v)
 void nabu_mark(int n)
 {
   if (n < 1 || n > NABU_MAX_MARK) { return; }
-  g_hits |= (1u << (n - 1));
+  g_hits |= (1ULL << (n - 1));
   if (g_fb == NULL) { return; }   /* RAM only until the screen is mapped */
   draw_all();                     /* keep the strip current, no replay needed */
 }
@@ -205,7 +205,7 @@ static int max_hit(void)
 {
   int n, m = 0;
   for (n = 1; n <= NABU_MAX_MARK; n++) {
-    if (g_hits & (1u << (n - 1))) { m = n; }
+    if (g_hits & (1ULL << (n - 1))) { m = n; }
   }
   return m;
 }
@@ -215,8 +215,8 @@ static void draw_all(void)
   if (g_fb == NULL) { return; }
   fill(0, 0, g_w, 232, 0xFF000000);
   g_slot = 0;
-  for (n = 1; n <= NABU_MAX_MARK; n++) {
-    if ((g_hits & (1u << (n - 1))) == 0) { continue; }
+  for (n = 1; n <= NABU_MAX_MARK && g_slot < 24; n++) {
+    if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
     fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_palette[(n - 1) & 7]);
     g_slot++;
   }
@@ -352,11 +352,28 @@ io.open(pep,'w',encoding='utf-8',newline='').write(pe)
 st=io.open(stp,encoding='utf-8').read()
 st=add_include(st, '#include <pexpert/pexpert.h>')
 st=ins_body_start(st, r'^kernel_bootstrap\(void\)\n\{\n', ['NABU_MARK(8);'], 'kernel_bootstrap')
-st=ins_before_in(st, r'^([ \t]*)mapping_adjust\(\);', ['NABU_MARK(14);'], 'mapping_adjust')
-st=ins_before_in(st, r'^([ \t]*)clock_service_create\(\);', ['NABU_MARK(15);'], 'clock_service_create')
-st=ins_before_in(st, r'^([ \t]*)device_service_create\(\);', ['NABU_MARK(16);'], 'device_service_create')
-st=ins_before_in(st, r'^([ \t]*)kernel_bootstrap_log\("PE_init_iokit"\);',
-                 ['NABU_MARK(17);'], 'before PE_init_iokit')
+# Auto-number every kernel_bootstrap log site. The log calls already trace the
+# phases, so each one doubles as a checkpoint and the digits name the exact line
+# the boot stops after.
+mfn=re.search(r'^kernel_bootstrap\(void\)\n\{\n',st,re.M)
+if mfn and 'NABU_MARK(18);' in st:
+    print('  auto marks already present')
+elif mfn:
+    i=mfn.end(); depth=1; j=i
+    while j<len(st) and depth>0:
+        if st[j]=='{': depth+=1
+        elif st[j]=='}': depth-=1
+        j+=1
+    body=st[i:j-1]
+    counter=[17]
+    def _mark(mo):
+        counter[0]+=1
+        return mo.group(0)+'\n'+mo.group(1)+'NABU_MARK(%d);'%counter[0]
+    body=re.sub(r'^([ \t]*)kernel_bootstrap(?:_thread)?_log\("[^"]*"\);', _mark, body, flags=re.M)
+    st=st[:i]+body+st[j-1:]
+    print('  auto marks in kernel_bootstrap: %d' % (counter[0]-17))
+else:
+    print('  WARN: kernel_bootstrap body not found')
 st=ins_after_in(st, r'^([ \t]*)PE_init_iokit\(\);', ['NABU_MARK(9);'], 'PE_init_iokit')
 io.open(stp,'w',encoding='utf-8',newline='').write(st)
 
