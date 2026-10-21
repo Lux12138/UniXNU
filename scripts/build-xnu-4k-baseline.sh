@@ -43,7 +43,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -54,19 +54,26 @@ def rw(p,f):
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
     s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map)\([^\n]*\);\n','',s,count=0,flags=re.M)
-    for n in (1,2,3,4,5,6):
+    for n in range(1,10):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
 def conff(s):
     return ''.join(l for l in s.splitlines(True) if 'nabu_early_mark.c' not in l)
 def vc_clean(t):
     t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
-    t=re.sub(r'\t/\* nabu: vcattach has just mapped the framebuffer.*?\n\t\}\n','',t,count=1,flags=re.S)
+    t=re.sub(r'\t/\* nabu: vcattach just mapped the framebuffer.*?\n\t\}\n','',t,count=1,flags=re.S)
+    return t
+def st_clean(t):
+    t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
+    for n in range(1,10):
+        t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 rw(sys.argv[1],arm)
 rw(sys.argv[2],conff)
 if len(sys.argv) > 3:
     rw(sys.argv[3],vc_clean)
+if len(sys.argv) > 4:
+    rw(sys.argv[4],st_clean)
 MKU
 fi
 # --- end nabu pre-clean ---
@@ -112,8 +119,9 @@ static volatile unsigned int *g_fb = NULL;
 static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
+static void draw_all(void);   /* defined below; nabu_mark keeps the screen current */
 static unsigned int g_hits = 0;   /* bit n-1 set == checkpoint n was reached */
-static const unsigned int g_colors[9] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000};
+static const unsigned int g_colors[10] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000,0xFF808080};
 static void fill(unsigned int x0, unsigned int y0, unsigned int w, unsigned int h, unsigned int c)
 {
   unsigned int x, y, xe = x0 + w, ye = y0 + h;
@@ -156,11 +164,10 @@ void nabu_mark_init(const unsigned long *v)
 }
 void nabu_mark(int n)
 {
-  if (n < 1 || n > 8) { return; }
+  if (n < 1 || n > 9) { return; }
   g_hits |= (1u << (n - 1));
-  if (g_fb == NULL || g_slot >= 8) { return; }   /* RAM only until armed */
-  fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
-  g_slot++;
+  if (g_fb == NULL) { return; }   /* RAM only until the screen is mapped */
+  draw_all();                     /* keep the strip current, no replay needed */
 }
 static void draw_all(void)
 {
@@ -168,7 +175,7 @@ static void draw_all(void)
   if (g_fb == NULL) { return; }
   fill(0, 0, g_w, 112, 0xFF000000);
   g_slot = 0;
-  for (n = 1; n <= 8; n++) {
+  for (n = 1; n <= 9; n++) {
     if ((g_hits & (1u << (n - 1))) == 0) { continue; }
     fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
     g_slot++;
@@ -205,97 +212,89 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c <<'MKP'
 import io,re,sys
-p=sys.argv[1]
+p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
-if '#include <arm/nabu_early_mark.h>' not in s:
-    h='#include <pexpert/arm/consistent_debug.h>'
-    if h in s:
-        s=s.replace(h,h+'\n#include <arm/nabu_early_mark.h>',1)
-    else:
-        last=None
-        for m in re.finditer(r'^#include [<"][^\n]*$',s,re.M):
-            last=m
-        if last:
-            s=s[:last.end()]+'\n#include <arm/nabu_early_mark.h>'+s[last.end():]
-            print('  note: include appended after the last #include line')
-        else:
-            print('  WARN: include anchor missing (consistent_debug.h)')
-def ind_of(m):
-    return m.group(1)
-def ins_before(pat, lines, label):
-    global s
-    if lines[0] in s:
-        return
-    m = re.search(pat, s, re.M)
+
+def ins_before_in(txt, pat, lines, label):
+    if lines[0] in txt:
+        return txt
+    m=re.search(pat,txt,re.M)
     if not m:
-        print('  WARN: mark anchor missing (%s)' % label)
-        return
-    ind = m.group(1)
-    s = s[:m.start()] + ''.join(ind + l + '\n' for l in lines) + s[m.start():]
-def ins_after(pat, lines, label):
-    global s
-    if lines[-1] in s:
-        return
-    m = re.search(pat, s, re.M)
+        print('  WARN: mark anchor missing (%s)'%label); return txt
+    ind=m.group(1)
+    return txt[:m.start()]+''.join(ind+l+'\n' for l in lines)+txt[m.start():]
+
+def ins_after_in(txt, pat, lines, label):
+    if lines[-1] in txt:
+        return txt
+    m=re.search(pat,txt,re.M)
     if not m:
-        print('  WARN: mark anchor missing (%s)' % label)
-        return
-    ind = m.group(1)
-    # m ends at the last character of the line; skip its newline before inserting
-    s = s[:m.end() + 1] + ''.join(ind + l + '\n' for l in lines) + s[m.end() + 1:]
-# MARK1 sits before the very first statement of arm_init: everything from here on
-# (JOP rebase/sign, cpu_data_init) runs before PE_init_platform.
-ins_before(r'^([ \t]*)arm_setup_pre_sign\(\);',
-           ['nabu_mark_init((const unsigned long *)&args->Video);', 'NABU_MARK(1);'],
-           'arm_init entry')
-ins_before(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
-ins_before(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
-ins_after(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
-# arm_vm_init brings the VM up, which is what makes an io_map possible at all.
-ins_after(r'^([ \t]*)arm_vm_init\(xmaxmem,[ \t]*args\);',
-          ['nabu_mark_map(args->Video.v_baseAddr, args->Video.v_rowBytes,'
-           ' args->Video.v_width, args->Video.v_height);', 'NABU_MARK(6);'],
-          'arm_vm_init')
-ins_after(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'],
-          'PE_init_platform TRUE')
+        print('  WARN: mark anchor missing (%s)'%label); return txt
+    ind=m.group(1)
+    return txt[:m.end()+1]+''.join(ind+l+'\n' for l in lines)+txt[m.end()+1:]
+
+def ins_body_start(txt, pat, lines, label):
+    if lines[0] in txt:
+        return txt
+    m=re.search(pat,txt,re.M)
+    if not m:
+        print('  WARN: mark anchor missing (%s)'%label); return txt
+    return txt[:m.end()]+''.join('\t'+l+'\n' for l in lines)+txt[m.end():]
+
+def add_include(txt, anchor):
+    if '#include <arm/nabu_early_mark.h>' in txt:
+        return txt
+    if anchor in txt:
+        return txt.replace(anchor, anchor+'\n#include <arm/nabu_early_mark.h>', 1)
+    m0=re.search(r'^#include [<"][^\n]*$',txt,re.M)
+    if m0:
+        print('  note: include after first #include')
+        return txt[:m0.end()]+'\n#include <arm/nabu_early_mark.h>'+txt[m0.end():]
+    print('  WARN: no include anchor')
+    return txt
+
+s = add_include(s, '#include <pexpert/arm/consistent_debug.h>')
+s = ins_before_in(s, r'^([ \t]*)arm_setup_pre_sign\(\);',
+      ['nabu_mark_init((const unsigned long *)&args->Video);','NABU_MARK(1);'], 'arm_init entry')
+s = ins_before_in(s, r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
+s = ins_after_in(s, r'^([ \t]*)arm_vm_init\(xmaxmem,[ \t]*args\);',
+      ['nabu_mark_map(args->Video.v_baseAddr, args->Video.v_rowBytes, args->Video.v_width, args->Video.v_height);',
+       'NABU_MARK(6);'], 'arm_vm_init')
+s = ins_before_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
+s = ins_after_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
+s = ins_after_in(s, r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'], 'PE_init_platform TRUE')
+s = ins_before_in(s, r'^([ \t]*)machine_startup\(args\);', ['NABU_MARK(7);'], 'machine_startup')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
-print('  marks inserted: 1=%s 2=%s 3=%s 4=%s 5=%s 6=%s map=%s' % (
-    'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s,
-    'NABU_MARK(4)' in s, 'NABU_MARK(5)' in s, 'NABU_MARK(6)' in s,
-    'nabu_mark_map(' in s))
-# vcattach() is the only place that maps the framebuffer (initialize_screen ->
-# ml_io_map_unmappable) and it runs from PE_init_printf(TRUE), long after arm_init.
-# Replaying the checkpoints anywhere earlier faults, so hook its closing brace and
-# keep a VA sanity check so a wrong guess stays harmless.
-vc=io.open(sys.argv[2],encoding='utf-8').read()
+
+vc=io.open(vcp,encoding='utf-8').read()
 if 'nabu_mark_rebind' not in vc:
-    if '#include <arm/nabu_early_mark.h>' not in vc:
-        m0=re.search(r'^#include [<"][^\n]*$',vc,re.M)
-        if m0:
-            vc=vc[:m0.end()]+'\n#include <arm/nabu_early_mark.h>'+vc[m0.end():]
-        else:
-            print('  WARN: video_console.c has no include line')
+    vc=add_include(vc, '#include <pexpert/pexpert.h>')
     m=re.search(r'^vcattach\(void\)\n\{\n',vc,re.M)
     if m:
         i=m.end(); depth=1
-        while i < len(vc) and depth > 0:
+        while i<len(vc) and depth>0:
             if vc[i]=='{': depth+=1
             elif vc[i]=='}': depth-=1
             i+=1
-        close=i-1
-        ins=('\t/* nabu: vcattach has just mapped the framebuffer; replay the checkpoints\n'
-             '\t * reached before the console existed. The address is only trusted when it\n'
-             '\t * already looks like a kernel VA, so a wrong guess cannot fault. */\n'
+        ins=('\t/* nabu: vcattach just mapped the framebuffer; replay the checkpoints. */\n'
              '\tif ((unsigned long)PE_state.video.v_baseAddr >= 0xFFFFFFF000000000UL) {\n'
              '\t\tnabu_mark_rebind((const unsigned long *)&PE_state.video);\n'
              '\t}\n')
-        vc=vc[:close]+ins+vc[close:]
+        vc=vc[:i-1]+ins+vc[i-1:]
         print('  rebind hooked at the end of vcattach')
     else:
-        print('  WARN: vcattach anchor missing in video_console.c')
-    io.open(sys.argv[2],'w',encoding='utf-8',newline='').write(vc)
+        print('  WARN: vcattach anchor missing')
+    io.open(vcp,'w',encoding='utf-8',newline='').write(vc)
+
+st=io.open(stp,encoding='utf-8').read()
+st=add_include(st, '#include <pexpert/pexpert.h>')
+st=ins_body_start(st, r'^kernel_bootstrap\(void\)\n\{\n', ['NABU_MARK(8);'], 'kernel_bootstrap')
+st=ins_after_in(st, r'^([ \t]*)PE_init_iokit\(\);', ['NABU_MARK(9);'], 'PE_init_iokit')
+io.open(stp,'w',encoding='utf-8',newline='').write(st)
+
+print('  marks placed: 1..9, map=%s' % ('nabu_mark_map(' in s))
 MKP
 fi
 # --- end nabu markers ---
