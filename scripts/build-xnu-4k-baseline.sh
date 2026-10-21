@@ -52,7 +52,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -320,7 +320,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -465,6 +465,29 @@ for _old, _new in (
     else:
         print('  WARN hardening anchor not found')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
+
+# Exception-vector hold. Every synchronous exception enters sleh_synchronous_sp1 with
+# esr/far already decoded by hardware. A kernel abort gets its trap data painted and then
+# spins, so the panel keeps the crime scene instead of losing it on reboot. Only abort
+# classes are trapped; SVC/BRK/MSR traps must keep flowing.
+slc=sys.argv[6]
+sl=io.open(slc,encoding='utf-8').read()
+if 'nabu_abort_hold' not in sl:
+    sl=add_include(sl, '#include <pexpert/pexpert.h>')
+    _hold = ('\t/* nabu_abort_hold: kernel abort -> paint EC/FAR and stop here. */\n'
+             '\t{\n'
+             '\t\tuint32_t _ec = (esr >> 26) & 0x3F;\n'
+             '\t\tif (_ec == 0x24 || _ec == 0x25 || _ec == 0x20 || _ec == 0x21) {\n'
+             '\t\t\tnabu_mark_quad((int)_ec,\n'
+             '\t\t\t    (int)((far >> 12) & 0xFF),\n'
+             '\t\t\t    (int)((far >> 20) & 0xFF),\n'
+             '\t\t\t    (int)((far >> 28) & 0xFF));\n'
+             '\t\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
+             '\t\t}\n'
+             '\t}\n')
+    sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
+                        [_hold], 'sleh abort hold')
+    io.open(slc,'w',encoding='utf-8',newline='').write(sl)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
