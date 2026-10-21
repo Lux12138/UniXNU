@@ -632,11 +632,10 @@ out = Path('build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837')
 stamp = out / '.boot-progress-mode'
 identity = mode + ':' + (hashlib.sha256(Path('build/boot-progress/libBootProgress.a').read_bytes()).hexdigest() if mode == '1' else 'disabled')
 if not stamp.exists() or stamp.read_text() != identity:
-    for directory, names in [('osfmk', ['arm_init','startup','video_console','serial_console','sleh']),
-                             ('bsd', ['bsd_init','kern_exec','kern_exit']), ('pexpert', ['pe_kprintf'])]:
-        for name in names:
-            (out / directory / 'DEVELOPMENT' / (name + '.o')).unlink(missing_ok=True)
-    (out / 'mach.development.bcm2837.unstripped.noctf').unlink(missing_ok=True)
+    # Do NOT unlink compiled objects here. LDFILELIST (run near the end of the build)
+    # requires every object to exist, and make can decide an object is up to date from
+    # its dependency cache even after the file was removed -- which made the link file
+    # list stage fail with a bare "Error 2" and no diagnostics.
     out.mkdir(parents=True, exist_ok=True)
     stamp.write_text(identity)
 PY
