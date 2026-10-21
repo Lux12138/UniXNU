@@ -808,6 +808,21 @@ EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")
 EXTRA_MAKE_ARGS+=("XNU_EXTERNAL_KERNEL_ARCHIVES=$KERNEL_ARCHIVE_DEPENDENCIES")
 echo "stub archive wired: $KERNEL_EXTRA_ARCHIVES"
 
+# nabu: NativeUfs/RamBlock/VirtioBlock include <IOKit/storage/*.h> from
+# build/storage-abi/include. The full audit (audit-storage-interface.py) also needs a
+# prelinked kernel that does not exist yet at this point, so generate the header tree
+# here -- the ABI qualification itself is a later, non-blocking gate.
+STABI="$ROOT/build/storage-abi"
+if [ -d "$ROOT/refer/IOStorageFamily" ] && [ ! -d "$STABI/include/IOKit/storage" ]; then
+  mkdir -p "$STABI/include/IOKit/storage"
+  cp "$ROOT"/refer/IOStorageFamily/*.h "$STABI/include/IOKit/storage/" 2>/dev/null || true
+  sdk_path=$(xcrun --sdk macosx --show-sdk-path 2>/dev/null)
+  if [ -n "$sdk_path" ] && [ -f "$sdk_path/usr/include/TargetConditionals.h" ]; then
+    cp "$sdk_path/usr/include/TargetConditionals.h" "$STABI/include/" 2>/dev/null || true
+  fi
+  echo "nabu: generated $STABI/include/IOKit/storage ($(ls "$STABI/include/IOKit/storage" | wc -l | tr -d ' ') headers)"
+fi
+
 make -C .cache/xnu-work "${XNU_BUILD_TARGET:-build}" SDKROOT="${XNU_SDKROOT:-iphoneos}" ARCH_CONFIGS=ARM64 V="${XNU_MAKE_V:-0}" \
   OTHER_CXXFLAGS="-include $ROOT/.cache/xnu-work/iokit/DriverKit/IORPC.h" \
   MACHINE_CONFIGS=BCM2837 KERNEL_CONFIGS=DEVELOPMENT \
