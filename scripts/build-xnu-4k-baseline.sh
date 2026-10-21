@@ -43,7 +43,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -59,8 +59,14 @@ def arm(s):
     return s
 def conff(s):
     return ''.join(l for l in s.splitlines(True) if 'nabu_early_mark.c' not in l)
+def vc_clean(t):
+    t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
+    t=re.sub(r'\t/\* nabu: vcattach has just mapped the framebuffer.*?\n\t\}\n','',t,count=1,flags=re.S)
+    return t
 rw(sys.argv[1],arm)
 rw(sys.argv[2],conff)
+if len(sys.argv) > 3:
+    rw(sys.argv[3],vc_clean)
 MKU
 fi
 # --- end nabu pre-clean ---
@@ -171,7 +177,7 @@ void nabu_mark_rebind(const unsigned long *v)
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]
 s=io.open(p,encoding='utf-8').read()
@@ -218,18 +224,44 @@ ins_before(r'^([ \t]*)arm_setup_pre_sign\(\);',
            'arm_init entry')
 ins_before(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
 ins_before(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
-# PE_create_console/vcattach maps the framebuffer and replaces PE_state.video.v_baseAddr
-# with the kernel virtual address. Writing through args->Video (a physical address) faults
-# before that point, so this is the first check that can be trusted to reach the screen.
-ins_after(r'^([ \t]*)PE_create_console\(\);',
-          ['nabu_mark_rebind((const unsigned long *)&PE_state.video);', 'NABU_MARK(4);'],
-          'PE_create_console after')
+ins_after(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
 ins_after(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'],
           'PE_init_platform TRUE')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
 print('  marks inserted: MARK1=%s MARK2=%s MARK3=%s MARK4=%s MARK5=%s' % (
     'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s,
     'NABU_MARK(4)' in s, 'NABU_MARK(5)' in s))
+# vcattach() is the only place that maps the framebuffer (initialize_screen ->
+# ml_io_map_unmappable) and it runs from PE_init_printf(TRUE), long after arm_init.
+# Replaying the checkpoints anywhere earlier faults, so hook its closing brace and
+# keep a VA sanity check so a wrong guess stays harmless.
+vc=io.open(sys.argv[2],encoding='utf-8').read()
+if 'nabu_mark_rebind' not in vc:
+    if '#include <arm/nabu_early_mark.h>' not in vc:
+        m0=re.search(r'^#include [<"][^\n]*$',vc,re.M)
+        if m0:
+            vc=vc[:m0.end()]+'\n#include <arm/nabu_early_mark.h>'+vc[m0.end():]
+        else:
+            print('  WARN: video_console.c has no include line')
+    m=re.search(r'^vcattach\(void\)\n\{\n',vc,re.M)
+    if m:
+        i=m.end(); depth=1
+        while i < len(vc) and depth > 0:
+            if vc[i]=='{': depth+=1
+            elif vc[i]=='}': depth-=1
+            i+=1
+        close=i-1
+        ins=('\t/* nabu: vcattach has just mapped the framebuffer; replay the checkpoints\n'
+             '\t * reached before the console existed. The address is only trusted when it\n'
+             '\t * already looks like a kernel VA, so a wrong guess cannot fault. */\n'
+             '\tif ((unsigned long)PE_state.video.v_baseAddr >= 0xFFFFFFF000000000UL) {\n'
+             '\t\tnabu_mark_rebind((const unsigned long *)&PE_state.video);\n'
+             '\t}\n')
+        vc=vc[:close]+ins+vc[close:]
+        print('  rebind hooked at the end of vcattach')
+    else:
+        print('  WARN: vcattach anchor missing in video_console.c')
+    io.open(sys.argv[2],'w',encoding='utf-8',newline='').write(vc)
 MKP
 fi
 # --- end nabu markers ---
