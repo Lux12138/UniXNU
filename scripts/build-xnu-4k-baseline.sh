@@ -352,6 +352,11 @@ io.open(pep,'w',encoding='utf-8',newline='').write(pe)
 st=io.open(stp,encoding='utf-8').read()
 st=add_include(st, '#include <pexpert/pexpert.h>')
 st=ins_body_start(st, r'^kernel_bootstrap\(void\)\n\{\n', ['NABU_MARK(8);'], 'kernel_bootstrap')
+# The digits said 26 (mac_policy_init) but 27 (PMAP_ACTIVATE_KERNEL) never came.
+# Split the ten lines in between: 45 = mac_policy_init returned, 46 = mach_ipc done.
+st=ins_after_in(st, r'^([ \t]*)mac_policy_init\(\);', ['NABU_MARK(45);'], 'mac_policy_init done')
+st=ins_after_in(st, r'^([ \t]*)kernel_startup_initialize_upto\(STARTUP_SUB_MACH_IPC\);',
+                ['NABU_MARK(46);'], 'mach_ipc done')
 # Auto-number every kernel_bootstrap log site. The log calls already trace the
 # phases, so each one doubles as a checkpoint and the digits name the exact line
 # the boot stops after.
