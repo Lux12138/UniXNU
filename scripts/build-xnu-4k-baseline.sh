@@ -388,6 +388,10 @@ ko=ins_body_start(ko, r'^ipc_kobject_register_startup\(ipc_kobject_ops_t ops\)\n
 # least once, so the fault is not in the store itself.
 ko=ins_after_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops;',
                 ['NABU_MARK(60);'], 'kobject register returned')
+# 77 on screen means the "already registered" test read a non-zero garbage type,
+# i.e. the ops array was never zeroed rather than a genuine double registration.
+ko=ins_before_in(ko, r'^([ \t]*)panic\("trying to register kobject',
+                 ['nabu_mark_val(77);'], 'kobject duplicate panic')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 
 st=io.open(stp,encoding='utf-8').read()
