@@ -75,16 +75,12 @@ if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
     if args.verified_root_bundle:
         command += ['-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
 if component == 'NativeUfs':
+    # The ufsReadWindow template always accesses the verified view member, so the
+    # verified-block personality is structural. nabu supplies the VerifiedRoot symbols
+    # through a stub archive with policy_count=0 (device is never published until a
+    # real signed policy exists); sheng supplies them through build-verified-root-probe.
     command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/NativeVirtioBlock'),
-                '-mgeneral-regs-only']
-    # nabu bring-up: only define the verified-block personality when explicitly requested.
-    # sheng hard-wired it on; that requires the VerifiedRoot/boot-progress archives which
-    # are not part of a first boot. Without the macro the device publishes unverified,
-    # which is acceptable for bring-up (root comes from the packed RAM disk, not UFS).
-    if args.verified_root:
-        command += ['-DNATIVE_VERIFIED_BLOCK=1']
-    if args.verified_root_bundle:
-        command += ['-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
+                '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1', '-mgeneral-regs-only']
 if component=='NativeOfflineGPU':
     command += ['-I',str(ROOT/'drivers/NativeVirtioConsole')]
 if component in ('NativeLegacyDisplay','NativeHidInput'):

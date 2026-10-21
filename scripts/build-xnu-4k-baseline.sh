@@ -823,6 +823,35 @@ EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")
 EXTRA_MAKE_ARGS+=("XNU_EXTERNAL_KERNEL_ARCHIVES=$KERNEL_ARCHIVE_DEPENDENCIES")
 echo "stub archive wired: $KERNEL_EXTRA_ARCHIVES"
 
+# nabu: VerifiedRoot symbols for NativeUfs. The real vr_open / vr_verify_block come from
+# kits/VerifiedRoot; the policy table is empty (count=0) so configureVerification fails
+# closed and the UFS device is never published until a signed policy exists.
+if [ "${XNU_NATIVE_UFS:-0}" = 1 ] && [ -d "$ROOT/kits/VerifiedRoot" ]; then
+  VR_SRC="$ROOT/kits/VerifiedRoot"
+  VR_OUT="$ROOT/build/verified-root-stub"
+  if [ ! -f "$VR_OUT/libVerifiedRootStub.a" ]; then
+    mkdir -p "$VR_OUT"
+    cat > "$VR_OUT/vr_data.cpp" <<'CPPEOF'
+#include "verified_root.h"
+#include "VerifiedBlockPolicy.h"
+extern "C" {
+const uint8_t verified_root_key[VR_KEY_BYTES] = {0};
+const NativeVerifiedBlockPolicy verified_root_policies[1] = {{nullptr, 0}};
+const uint64_t verified_root_policy_count = 0;
+const struct vr_crypto vr_xnu_crypto = {nullptr, nullptr};
+}
+CPPEOF
+    xcrun --sdk iphoneos clang++ -target arm64-apple-ios17.0 -mkernel -ffreestanding -fno-builtin -std=gnu++2b -O2       -I "$VR_SRC/include" -I "$ROOT/drivers/NativeVirtioBlock"       -c -o "$VR_OUT/vr_data.o" "$VR_OUT/vr_data.cpp" || echo "vr_data compile failed"
+    xcrun --sdk iphoneos clang -target arm64-apple-ios17.0 -mkernel -ffreestanding -fno-builtin -std=gnu99 -O2       -I "$VR_SRC/include"       -c -o "$VR_OUT/verified_root.o" "$VR_SRC/src/verified_root.c" || echo "verified_root compile failed"
+    ar rcs "$VR_OUT/libVerifiedRootStub.a" "$VR_OUT/vr_data.o" "$VR_OUT/verified_root.o" 2>/dev/null || true
+    echo "nabu: built VerifiedRoot stub archive"
+  fi
+  KERNEL_EXTRA_ARCHIVES="${KERNEL_EXTRA_ARCHIVES:-} -Wl,-force_load,$VR_OUT/libVerifiedRootStub.a"
+  KERNEL_ARCHIVE_DEPENDENCIES="${KERNEL_ARCHIVE_DEPENDENCIES:-} $VR_OUT/libVerifiedRootStub.a"
+  EXTRA_MAKE_ARGS+=("LD_KERNEL_ARCHIVES=$KERNEL_EXTRA_ARCHIVES")
+  EXTRA_MAKE_ARGS+=("XNU_EXTERNAL_KERNEL_ARCHIVES=$KERNEL_ARCHIVE_DEPENDENCIES")
+fi
+
 # nabu: NativeUfs/RamBlock/VirtioBlock include <IOKit/storage/*.h> from
 # build/storage-abi/include. The full audit (audit-storage-interface.py) also needs a
 # prelinked kernel that does not exist yet at this point, so generate the header tree
