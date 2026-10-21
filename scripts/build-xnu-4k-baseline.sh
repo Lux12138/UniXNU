@@ -66,7 +66,7 @@ def vc_clean(t):
         t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 def st_clean(t):
-    t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
+    t=re.sub(r'^#include (?:"\.\./\.\./osfmk/arm/nabu_early_mark\.h"|<arm/nabu_early_mark\.h>)\n','',t,count=1,flags=re.M)
     for n in range(1,14):
         t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
@@ -299,7 +299,14 @@ if 'nabu_mark_rebind' not in vc:
 
 pep=sys.argv[4]
 pe=io.open(pep,encoding='utf-8').read()
-pe=add_include(pe, '#include <pexpert/pexpert.h>')
+# pexpert/arm is compiled without the osfmk include root, so <arm/...> does not resolve
+# there; a quoted relative include from pexpert/arm to osfmk/arm always does.
+if '#include "../../osfmk/arm/nabu_early_mark.h"' not in pe:
+    m0=re.search(r'^#include [<"][^\n]*$',pe,re.M)
+    if m0:
+        pe=pe[:m0.end()]+'\n#include "../../osfmk/arm/nabu_early_mark.h"'+pe[m0.end():]
+    else:
+        print('  WARN: pe_init.c has no include line')
 pe=ins_body_start(pe, r'^PE_init_iokit\(void\)\n\{\n', ['NABU_MARK(10);'], 'PE_init_iokit entry')
 pe=ins_after_in(pe, r'^([ \t]*)PE_init_printf\(TRUE\);', ['NABU_MARK(13);'], 'PE_init_printf TRUE')
 io.open(pep,'w',encoding='utf-8',newline='').write(pe)
