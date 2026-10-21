@@ -102,6 +102,10 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
       echo "nabu: skipping $(basename "$PATCH") (offline-owner patch group drifted; unrelated to boot bring-up)"
       continue
       ;;
+    *zzy-native-gpu-addon-mount.patch)
+      echo "nabu: skipping $(basename "$PATCH") (depends on the skipped offline-owner group)"
+      continue
+      ;;
   esac
   if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
     git -C .cache/xnu-work apply --check "$PATCH"
