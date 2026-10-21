@@ -93,19 +93,9 @@ for LATE_PATCH in "$ROOT/patches/xnu/zzz-boot-progress.patch" "$ROOT/patches/xnu
   fi
 done
 for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.patch; do
-  if git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
-    continue            # already applied
-  fi
-  if git -C .cache/xnu-work apply --check "$PATCH" >/dev/null 2>&1; then
+  if ! git -C .cache/xnu-work apply --reverse --check "$PATCH" >/dev/null 2>&1; then
+    git -C .cache/xnu-work apply --check "$PATCH"
     git -C .cache/xnu-work apply "$PATCH"
-  else
-    # The patch set drifted against this tree: offline-owner reshaped the bsd_init
-    # rootauth block and kern_exec paths, and the later zzz/zzy patches assume that
-    # reshape. git apply is strict about context, so fall back to patch --fuzz, which
-    # tolerates the line drift these patches accumulated.
-    echo "nabu: strict apply failed, retrying with fuzz: $(basename "$PATCH")"
-    ( cd .cache/xnu-work && patch -p1 --forward --fuzz=3 --no-backup-if-mismatch -i "$PATCH" ) \
-      || echo "nabu: WARN patch unresolved: $(basename "$PATCH")"
   fi
 done
 # source-machine-layer.patch adds amcc_rorgn_{ppl,ppl_amcc,ppl_ctrr3,common}.c to
