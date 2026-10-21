@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_init\([^\n]*\);\n','',s,count=1,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind)\([^\n]*\);\n','',s,count=0,flags=re.M)
     for n in (1,2,3,4,5):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -86,10 +86,11 @@ done
 # Editing either before the loop breaks their apply context.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.h <<'MKH'
-/* Take boot_args.Video as an opaque unsigned long word stream: this XNU declares
- * it as struct Boot_Video, older ones as unsigned long long[6]. Reading words
- * keeps this file independent of either declaration. */
+/* The framebuffer is a physical address here and is NOT mapped yet, so the early
+ * checkpoints only record RAM state; rebind() replays them once the console has
+ * mapped the screen. */
 void nabu_mark_init(const unsigned long *video);
+void nabu_mark_rebind(const unsigned long *video);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -100,6 +101,8 @@ static volatile unsigned int *g_fb = NULL;
 static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
+static unsigned int g_hits = 0;   /* bit n-1 set == checkpoint n was reached */
+static const unsigned int g_colors[9] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000};
 static void fill(unsigned int x0, unsigned int y0, unsigned int w, unsigned int h, unsigned int c)
 {
   unsigned int x, y, xe = x0 + w, ye = y0 + h;
@@ -112,44 +115,59 @@ static int sane(unsigned long row, unsigned long w, unsigned long h)
 {
   return row >= 4 && row <= 65536 && w >= 1 && w <= 8192 && h >= 1 && h <= 8192;
 }
-void nabu_mark_init(const unsigned long *v)
+static int set_geom(const unsigned long *v)
 {
   unsigned long row, w, h;
   int fallback = 0;
-  g_fb = NULL; g_px = 0; g_w = 0; g_h = 0; g_slot = 0;
-  if (v == NULL || v[0] == 0) { return; }          /* no framebuffer: give up */
+  g_fb = NULL; g_px = 0; g_w = 0; g_h = 0;
+  if (v == NULL || v[0] == 0) { return 0; }
   /* struct Boot_Video order: base, display, rowBytes, width, height, depth */
   row = v[2]; w = v[3]; h = v[4];
   if (!sane(row, w, h)) {
     /* legacy boot_args.Video array order: base, rowBytes, width, height, ... */
     row = v[1]; w = v[2]; h = v[3];
     fallback = 1;
-    if (!sane(row, w, h)) {
-      /* Geometry is unusable, but the base is writable-looking: mark a 1px
-       * probe so "framebuffer NOT mapped" stays distinguishable from
-       * "framebuffer mapped but geometry garbage". */
-      g_fb = (volatile unsigned int *)(unsigned long)v[0];
-      g_px = 4096; g_w = 4096; g_h = 4096;
-      fill(0, 0, 16, 16, 0xFFFF0000);
-      g_fb = NULL;
-      return;
-    }
+    if (!sane(row, w, h)) { return 0; }
   }
   g_fb = (volatile unsigned int *)(unsigned long)v[0];
   g_px = row / 4;
   g_w = (unsigned int)w; g_h = (unsigned int)h;
-  fill(0, 0, g_w, 112, 0xFF000000);
-  /* fallback layout (or a display/depth that is not 32bpp) shows up as a red
-   * block at the far end of the strip, so a mis-ordered boot_args is visible. */
-  if (fallback || (v[5] & 0xFF) != 32) { fill(32 + 7 * 64, 32, 48, 48, 0xFFFF0000); }
+  return fallback ? 2 : 1;
+}
+/* Arm WITHOUT touching the framebuffer. Before PE_create_console the kernel has no
+ * mapping for the video aperture, so a store to it faults and ends the boot; the
+ * checkpoints must therefore stay in RAM until the console maps the screen. */
+void nabu_mark_init(const unsigned long *v)
+{
+  (void)v;
+  g_fb = NULL; g_px = 0; g_w = 0; g_h = 0;
+  g_slot = 0; g_hits = 0;
 }
 void nabu_mark(int n)
 {
-  static const unsigned int colors[9] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000};
-  if (g_fb == NULL || n < 1 || n > 8 || g_slot >= 8) { return; }
-  fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, colors[n]);
+  if (n < 1 || n > 8) { return; }
+  g_hits |= (1u << (n - 1));
+  if (g_fb == NULL || g_slot >= 8) { return; }   /* RAM only until armed */
+  fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
   g_slot++;
 }
+/* Call once PE_create_console/vcattach has mapped the framebuffer: PE_state.video holds
+ * the kernel virtual address by then. Replays every checkpoint reached so far. */
+void nabu_mark_rebind(const unsigned long *v)
+{
+  int n;
+  int geom = set_geom(v);
+  if (geom == 0) { return; }
+  fill(0, 0, g_w, 112, 0xFF000000);
+  g_slot = 0;
+  for (n = 1; n <= 8; n++) {
+    if ((g_hits & (1u << (n - 1))) == 0) { continue; }
+    fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
+    g_slot++;
+  }
+  if (geom == 2 || (v[5] & 0xFF) != 32) { fill(32 + 7 * 64, 32, 48, 48, 0xFFFF0000); }
+}
+
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
@@ -200,7 +218,12 @@ ins_before(r'^([ \t]*)arm_setup_pre_sign\(\);',
            'arm_init entry')
 ins_before(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
 ins_before(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
-ins_after(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
+# PE_create_console/vcattach maps the framebuffer and replaces PE_state.video.v_baseAddr
+# with the kernel virtual address. Writing through args->Video (a physical address) faults
+# before that point, so this is the first check that can be trusted to reach the screen.
+ins_after(r'^([ \t]*)PE_create_console\(\);',
+          ['nabu_mark_rebind((const unsigned long *)&PE_state.video);', 'NABU_MARK(4);'],
+          'PE_create_console after')
 ins_after(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'],
           'PE_init_platform TRUE')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
