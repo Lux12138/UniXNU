@@ -43,7 +43,7 @@ fi
 # work tree those edits must be removed first or `git apply --check` fails.
 if [ -d .cache/xnu-work/osfmk/arm ]; then
   rm -f .cache/xnu-work/osfmk/arm/nabu_early_mark.c .cache/xnu-work/osfmk/arm/nabu_early_mark.h
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c <<'MKU'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/conf/files.arm64 .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c <<'MKU'
 import io,re,sys
 def rw(p,f):
     s=io.open(p,encoding='utf-8').read()
@@ -54,7 +54,7 @@ def rw(p,f):
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
     s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map)\([^\n]*\);\n','',s,count=0,flags=re.M)
-    for n in range(1,10):
+    for n in range(1,14):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
 def conff(s):
@@ -62,10 +62,12 @@ def conff(s):
 def vc_clean(t):
     t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
     t=re.sub(r'\t/\* nabu: vcattach just mapped the framebuffer.*?\n\t\}\n','',t,count=1,flags=re.S)
+    for n in range(1,14):
+        t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 def st_clean(t):
     t=re.sub(r'^#include <arm/nabu_early_mark\.h>\n','',t,count=1,flags=re.M)
-    for n in range(1,10):
+    for n in range(1,14):
         t=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',t,count=1,flags=re.M)
     return t
 rw(sys.argv[1],arm)
@@ -74,6 +76,8 @@ if len(sys.argv) > 3:
     rw(sys.argv[3],vc_clean)
 if len(sys.argv) > 4:
     rw(sys.argv[4],st_clean)
+if len(sys.argv) > 5:
+    rw(sys.argv[5],st_clean)
 MKU
 fi
 # --- end nabu pre-clean ---
@@ -121,7 +125,7 @@ static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
 static void draw_all(void);   /* defined below; nabu_mark keeps the screen current */
 static unsigned int g_hits = 0;   /* bit n-1 set == checkpoint n was reached */
-static const unsigned int g_colors[10] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000,0xFF808080};
+static const unsigned int g_colors[14] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000,0xFF808080,0xFF00FFFF,0xFFFF00FF,0xFFC0A000,0xFF008080};
 static void fill(unsigned int x0, unsigned int y0, unsigned int w, unsigned int h, unsigned int c)
 {
   unsigned int x, y, xe = x0 + w, ye = y0 + h;
@@ -164,7 +168,7 @@ void nabu_mark_init(const unsigned long *v)
 }
 void nabu_mark(int n)
 {
-  if (n < 1 || n > 9) { return; }
+  if (n < 1 || n > 13) { return; }
   g_hits |= (1u << (n - 1));
   if (g_fb == NULL) { return; }   /* RAM only until the screen is mapped */
   draw_all();                     /* keep the strip current, no replay needed */
@@ -175,7 +179,7 @@ static void draw_all(void)
   if (g_fb == NULL) { return; }
   fill(0, 0, g_w, 112, 0xFF000000);
   g_slot = 0;
-  for (n = 1; n <= 9; n++) {
+  for (n = 1; n <= 13; n++) {
     if ((g_hits & (1u << (n - 1))) == 0) { continue; }
     fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
     g_slot++;
@@ -212,7 +216,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -273,6 +277,9 @@ if 'nabu_mark_rebind' not in vc:
     vc=add_include(vc, '#include <pexpert/pexpert.h>')
     m=re.search(r'^vcattach\(void\)\n\{\n',vc,re.M)
     if m:
+        if 'NABU_MARK(11)' not in vc:
+            vc=vc[:m.end()]+'\tNABU_MARK(11);\n'+vc[m.end():]
+            m=re.search(r'^vcattach\(void\)\n\{\n',vc,re.M)
         i=m.end(); depth=1
         while i<len(vc) and depth>0:
             if vc[i]=='{': depth+=1
@@ -286,7 +293,16 @@ if 'nabu_mark_rebind' not in vc:
         print('  rebind hooked at the end of vcattach')
     else:
         print('  WARN: vcattach anchor missing')
+    vc=ins_after_in(vc, r'^([ \t]*)initialize_screen\(NULL,[ \t]*kPEAcquireScreen\);',
+                    ['NABU_MARK(12);'], 'initialize_screen acquire')
     io.open(vcp,'w',encoding='utf-8',newline='').write(vc)
+
+pep=sys.argv[4]
+pe=io.open(pep,encoding='utf-8').read()
+pe=add_include(pe, '#include <pexpert/pexpert.h>')
+pe=ins_body_start(pe, r'^PE_init_iokit\(void\)\n\{\n', ['NABU_MARK(10);'], 'PE_init_iokit entry')
+pe=ins_after_in(pe, r'^([ \t]*)PE_init_printf\(TRUE\);', ['NABU_MARK(13);'], 'PE_init_printf TRUE')
+io.open(pep,'w',encoding='utf-8',newline='').write(pe)
 
 st=io.open(stp,encoding='utf-8').read()
 st=add_include(st, '#include <pexpert/pexpert.h>')
