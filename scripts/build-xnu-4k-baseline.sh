@@ -423,6 +423,17 @@ if _old_panic in ko:
     print('  mig: kroutine size panic replaced with maxsize fallback')
 else:
     print('  mig: WARN kroutine panic anchor not found')
+# mig_init ends with a diagnostics printf. kprintf before the console exists is a
+# fault, which is why the boot still stopped right after the kroutine fallback
+# stopped panicking. The line is informational only.
+_old_printf = ('\tprintf("mig_table_max_displ = %d mach_kobj_count = %d\\n",\n'
+               '\t    mig_table_max_displ, mach_kobj_count);')
+_new_printf = ('\t/* UNIXNU: diagnostics only; kprintf before the console is a fault. */')
+if _old_printf in ko:
+    ko = ko.replace(_old_printf, _new_printf, 1)
+    print('  mig: trailing diagnostics printf removed')
+else:
+    print('  mig: WARN trailing printf anchor not found')
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
