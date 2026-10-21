@@ -835,6 +835,11 @@ if [ "${XNU_NATIVE_UFS:-0}" = 1 ] && [ -d "$ROOT/kits/VerifiedRoot" ]; then
 #include "verified_root.h"
 #include "VerifiedBlockPolicy.h"
 extern "C" {
+// C++ const defaults to internal linkage; the extern redeclarations force
+// external linkage so the linker can see these two (policies/count already
+// carry extern in VerifiedBlockPolicy.h).
+extern const uint8_t verified_root_key[VR_KEY_BYTES];
+extern const struct vr_crypto vr_xnu_crypto;
 const uint8_t verified_root_key[VR_KEY_BYTES] = {0};
 const NativeVerifiedBlockPolicy verified_root_policies[1] = {{nullptr, 0}};
 const uint64_t verified_root_policy_count = 0;
