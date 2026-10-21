@@ -108,6 +108,17 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
       || echo "nabu: WARN patch unresolved: $(basename "$PATCH")"
   fi
 done
+# source-machine-layer.patch adds amcc_rorgn_{ppl,ppl_amcc,ppl_ctrr3,common}.c to
+# osfmk/conf/files.arm64, but those sources do not exist in xnu-10063.141.1 -- they come
+# from a later tree. With them listed, the build dies in LDFILELIST with a bare
+# "Error 2" and no diagnostic. They are optional PPL/AMCC helpers, so drop the rows.
+if [ -f .cache/xnu-work/osfmk/conf/files.arm64 ]; then
+  if grep -q 'amcc_rorgn' .cache/xnu-work/osfmk/conf/files.arm64; then
+    echo "nabu: removing amcc_rorgn entries that reference non-existent sources"
+    grep -v 'amcc_rorgn' .cache/xnu-work/osfmk/conf/files.arm64 > .cache/xnu-work/osfmk/conf/files.arm64.tmp
+    mv .cache/xnu-work/osfmk/conf/files.arm64.tmp .cache/xnu-work/osfmk/conf/files.arm64
+  fi
+fi
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
