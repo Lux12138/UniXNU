@@ -621,12 +621,18 @@ fi
     test -f "$UFS_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$UFS_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $UFS_ARCHIVE"
-    # nabu: NativeUfsBlock derives from IOBlockStorageDevice (IOStorageFamily kext, not
-    # built into the kernel), and references verified-root / boot-progress symbols.
-    # Those resolve during prelink, where IOStorageFamily is merged from the original
-    # kernelcache (board.toml [kernel.prelink] roots). Let the make-stage link accept
-    # them as undefined instead of failing.
-    EXTRA_MAKE_ARGS+=("LDFLAGS_KERNEL_DEVELOPMENT=-Wl,-undefined,dynamic_lookup")
+    # nabu: NativeUfsBlock derives from IOBlockStorageDevice, which lives in the
+    # IOStorageFamily kext rather than the kernel. audit-storage-interface.py compiles
+    # the real IOBlockStorageDevice.cpp with the kernel's own compile arguments into
+    # build/storage-abi/IOBlockStorageDevice-reference.o; linking that object supplies
+    # the base class, its vtable and gMetaClass so make-stage linking succeeds.
+    STORAGE_REF=$ROOT/build/storage-abi/IOBlockStorageDevice-reference.o
+    if [ -f "$STORAGE_REF" ]; then
+      KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $STORAGE_REF"
+      echo "nabu: linking $STORAGE_REF for IOBlockStorageDevice"
+    else
+      echo "nabu: WARNING storage reference object missing; NativeUfs will not link" >&2
+    fi
   fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
