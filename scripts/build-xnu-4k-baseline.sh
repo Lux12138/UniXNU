@@ -53,8 +53,8 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind)\([^\n]*\);\n','',s,count=0,flags=re.M)
-    for n in (1,2,3,4,5):
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map)\([^\n]*\);\n','',s,count=0,flags=re.M)
+    for n in (1,2,3,4,5,6):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
 def conff(s):
@@ -97,12 +97,17 @@ if [ -d .cache/xnu-work/osfmk/arm ]; then
  * mapped the screen. */
 void nabu_mark_init(const unsigned long *video);
 void nabu_mark_rebind(const unsigned long *video);
+/* Map the video aperture ourselves once the VM is up and replay what we have. */
+void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
   cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.c <<'MKC'
 #include "nabu_early_mark.h"
 #include <stddef.h>
+#include <machine/machine_routines.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 static volatile unsigned int *g_fb = NULL;
 static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
@@ -157,13 +162,10 @@ void nabu_mark(int n)
   fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
   g_slot++;
 }
-/* Call once PE_create_console/vcattach has mapped the framebuffer: PE_state.video holds
- * the kernel virtual address by then. Replays every checkpoint reached so far. */
-void nabu_mark_rebind(const unsigned long *v)
+static void draw_all(void)
 {
   int n;
-  int geom = set_geom(v);
-  if (geom == 0) { return; }
+  if (g_fb == NULL) { return; }
   fill(0, 0, g_w, 112, 0xFF000000);
   g_slot = 0;
   for (n = 1; n <= 8; n++) {
@@ -171,7 +173,33 @@ void nabu_mark_rebind(const unsigned long *v)
     fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_colors[n]);
     g_slot++;
   }
+}
+/* Replay through an address the caller already knows is kernel-virtual. */
+void nabu_mark_rebind(const unsigned long *v)
+{
+  int geom = set_geom(v);
+  if (geom == 0) { return; }
+  draw_all();
   if (geom == 2 || (v[5] & 0xFF) != 32) { fill(32 + 7 * 64, 32, 48, 48, 0xFFFF0000); }
+}
+/* Map the video aperture with the kernel's own io_map. vcattach is not reached until
+ * kernel_bootstrap (PE_init_iokit), so before this call the physical base address is
+ * unmapped and every store to it faults. Call after arm_vm_init. */
+void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h)
+{
+  vm_offset_t va;
+  unsigned long size;
+
+  if (pbase == 0 || row < 4 || row > 65536 || w == 0 || w > 8192 || h == 0 || h > 8192) { return; }
+  size = row * h;
+  if (size == 0) { return; }
+  va = ml_io_map_unmappable((vm_map_offset_t)(pbase & ~0xFFFUL),
+                            (vm_map_size_t)round_page(size), VM_WIMG_WCOMB);
+  if (va == 0) { return; }
+  g_fb = (volatile unsigned int *)(unsigned long)(va + (pbase & 0xFFFUL));
+  g_px = row / 4;
+  g_w = (unsigned int)w; g_h = (unsigned int)h;
+  draw_all();
 }
 
 MKC
@@ -225,12 +253,18 @@ ins_before(r'^([ \t]*)arm_setup_pre_sign\(\);',
 ins_before(r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_MARK(2);'], 'PE_init_platform')
 ins_before(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
 ins_after(r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
+# arm_vm_init brings the VM up, which is what makes an io_map possible at all.
+ins_after(r'^([ \t]*)arm_vm_init\(xmaxmem,[ \t]*args\);',
+          ['nabu_mark_map(args->Video.v_baseAddr, args->Video.v_rowBytes,'
+           ' args->Video.v_width, args->Video.v_height);', 'NABU_MARK(6);'],
+          'arm_vm_init')
 ins_after(r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'],
           'PE_init_platform TRUE')
 io.open(p,'w',encoding='utf-8',newline='').write(s)
-print('  marks inserted: MARK1=%s MARK2=%s MARK3=%s MARK4=%s MARK5=%s' % (
+print('  marks inserted: 1=%s 2=%s 3=%s 4=%s 5=%s 6=%s map=%s' % (
     'NABU_MARK(1)' in s, 'NABU_MARK(2)' in s, 'NABU_MARK(3)' in s,
-    'NABU_MARK(4)' in s, 'NABU_MARK(5)' in s))
+    'NABU_MARK(4)' in s, 'NABU_MARK(5)' in s, 'NABU_MARK(6)' in s,
+    'nabu_mark_map(' in s))
 # vcattach() is the only place that maps the framebuffer (initialize_screen ->
 # ml_io_map_unmappable) and it runs from PE_init_printf(TRUE), long after arm_init.
 # Replaying the checkpoints anywhere earlier faults, so hook its closing brace and
