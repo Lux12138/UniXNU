@@ -413,11 +413,11 @@ ko=io.open(kop,encoding='utf-8').read()
 # panic. Fall back to the subsystem's advertised max reply size so the boot can
 # continue; the value is conservative, not exact.
 _old_panic = 'panic("kroutine must have precise size %d %d", mig_e[i]->start, j);'
-_new_fallback = ('/* UNIXNU: mig lost this descriptor reply size; use the */\n'
-                 '\t\t\t\t\t/* subsystem maximum instead of aborting the boot. */\n'
-                 '\t\t\t\t\tmig_buckets[pos].kreply_size = mig_e[i]->maxsize;\n'
-                 '\t\t\t\t\tmig_buckets[pos].kreply_desc_cnt =\n'
-                 '\t\t\t\t\t    mig_e[i]->kroutine[j].reply_descr_count;')
+_new_fallback = ('/* UNIXNU: this descriptor lost its reply size and its layout */\n'
+                 '\t\t\t\t\t/* cannot be trusted either (reading reply_descr_count here */\n'
+                 '\t\t\t\t\t/* faults). Advertise the subsystem maximum and leave the */\n'
+                 '\t\t\t\t\t/* descriptor counts at zero. */\n'
+                 '\t\t\t\t\tmig_buckets[pos].kreply_size = mig_e[i]->maxsize;')
 if _old_panic in ko:
     ko = ko.replace(_old_panic, _new_fallback, 1)
     print('  mig: kroutine size panic replaced with maxsize fallback')
