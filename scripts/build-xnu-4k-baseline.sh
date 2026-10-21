@@ -415,8 +415,12 @@ for _num, _pat, _lbl in (
     (73, r'^([ \t]*)panic\("multiple entries with the same msgh_id"\);', 'mig duplicate id'),
     (74, r'^([ \t]*)panic\("the mig dispatch table is too small"\);', 'mig table too small'),
     (75, r'^([ \t]*)panic\("kroutine must have precise size', 'mig kroutine size'),
+    # Before the kroutine panic, show which mig_e[] entry is malformed (the loop
+    # index i is in scope there). mig_e has ~30 elements, so one cell is enough.
+    (76, r'^([ \t]*)panic\("kroutine must have precise size', 'mig subsystem index'),
 ):
-    ko = ins_before_in(ko, _pat, ['nabu_mark_val(%d);' % _num], _lbl)
+    _arg = 'nabu_mark_val((int)i);' if _num == 76 else 'nabu_mark_val(%d);' % _num
+    ko = ins_before_in(ko, _pat, [_arg], _lbl)
 
 # 81 immediately before the store, 60 immediately after it: the pair says whether
 # the fault is the store itself or something after it returned.
