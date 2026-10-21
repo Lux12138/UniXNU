@@ -320,7 +320,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -488,6 +488,26 @@ if 'nabu_abort_hold' not in sl:
     sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
                         [_hold], 'sleh abort hold')
     io.open(slc,'w',encoding='utf-8',newline='').write(sl)
+
+# panic() hold. An abort would have been caught at the vector, so if the panel froze
+# without EC/FAR the boot died in panic() instead -- and panic() needs the console that
+# does not exist yet. Paint the format-string pointer (bits 4..9, then bits 10..17) and
+# spin: the value maps back to one exact call site in the binary.
+dbc=sys.argv[7]
+db=io.open(dbc,encoding='utf-8').read()
+if 'nabu_panic_hold' not in db:
+    db=add_include(db, '#include <pexpert/pexpert.h>')
+    _ph = ('\t/* nabu_panic_hold: paint the format pointer and stop. */\n'
+           '\t{\n'
+           '\t\tunsigned long _ps = (unsigned long)str;\n'
+           '\t\tnabu_mark_quad((int)((_ps >> 4) & 0x3F),\n'
+           '\t\t    (int)((_ps >> 10) & 0x3F),\n'
+           '\t\t    (int)((_ps >> 16) & 0xFF),\n'
+           '\t\t    (int)((_ps >> 24) & 0xFF));\n'
+           '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
+           '\t}\n')
+    db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
+    io.open(dbc,'w',encoding='utf-8',newline='').write(db)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
