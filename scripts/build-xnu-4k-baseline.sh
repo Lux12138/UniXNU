@@ -98,8 +98,8 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
   # write auditing, which is unrelated to getting XNU past mig_init, so skip it
   # instead of blocking every kernel build on it.
   case "$PATCH" in
-    *offline-owner-root-binding-audit.patch)
-      echo "nabu: skipping $(basename "$PATCH") (context drift, unrelated to boot bring-up)"
+    *offline-owner-*)
+      echo "nabu: skipping $(basename "$PATCH") (offline-owner patch group drifted; unrelated to boot bring-up)"
       continue
       ;;
   esac
