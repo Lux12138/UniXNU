@@ -456,6 +456,13 @@ for _num, _pat, _lbl in (
     (75, r'^([ \t]*)panic\("kroutine must have precise size', 'mig kroutine size'),
 ):
     ko = ins_before_in(ko, _pat, ['nabu_mark_val(%d);' % _num], _lbl)
+# Progress inside mig_init: i (subsystem), n (count), mach_kobj_count (entries
+# registered so far). If the panel freezes with a constant count, the inner bucket
+# probe loop is spinning rather than faulting.
+ko = ins_body_start(ko, r'^mig_init\(void\)\n\{\n', [], 'mig init start')
+ko = ins_after_in(ko, r'^([ \t]*)for \(i = 0; i < n; i\+\+\) \{',
+                  ['nabu_mark_quad((int)i, (int)n, (int)mach_kobj_count, 0);'],
+                  'mig loop progress')
 # One quad on the kroutine panic: i, j, msgid, and the stub address low bits.
 # Together they name the exact routine without another build.
 ko = ins_before_in(ko, r'^([ \t]*)panic\("kroutine must have precise size',
