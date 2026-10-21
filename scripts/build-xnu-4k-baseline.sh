@@ -243,10 +243,27 @@ static void draw_all(void)
   if (g_fb == NULL) { return; }
   fill(0, 0, g_w, 260, 0xFF000000);
   g_slot = 0;
-  for (n = 1; n <= NABU_MAX_MARK && g_slot < 24; n++) {
-    if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
-    fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_palette[(n - 1) & 7]);
-    g_slot++;
+  {
+    /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
+     * late ones (45/46/60/...) would otherwise never appear on the strip. */
+    int first = 1, total = 0;
+    for (n = 1; n <= NABU_MAX_MARK; n++) {
+      if (g_hits & (1ULL << (n - 1))) { total++; }
+    }
+    if (total > 24) {
+      int seen = 0;
+      for (n = 1; n <= NABU_MAX_MARK; n++) {
+        if (g_hits & (1ULL << (n - 1))) {
+          seen++;
+          if (seen == total - 23) { first = n; break; }
+        }
+      }
+    }
+    for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
+      if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
+      fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, g_palette[(n - 1) & 7]);
+      g_slot++;
+    }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
   draw_number(32, 132, max_hit(), 20);
@@ -382,8 +399,6 @@ ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
 # type that was registered twice (that panic is the only one in this function).
-ko=ins_body_start(ko, r'^ipc_kobject_register_startup\(ipc_kobject_ops_t ops\)\n\{\n',
-                  ['nabu_mark_val((int)ops->iko_op_type);'], 'kobject register')
 # Bisect inside the call: if block 60 ever appears, the function did return at
 # least once, so the fault is not in the store itself.
 ko=ins_after_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops;',
@@ -406,8 +421,8 @@ st=ins_body_start(st, r'^kernel_bootstrap\(void\)\n\{\n', ['NABU_MARK(8);'], 'ke
 # is the subsystem that faulted.
 st=ins_before_in(st, r'^([ \t]*)while \(cur < startup_entries_end && cur->subsystem <= upto\) \{$',
                  ['NABU_MARK(50);'], 'startup loop entry')
-st=ins_before_in(st, r'^([ \t]*)cur->func\(cur->arg\);',
-                 ['nabu_mark_show((int)cur->subsystem);'], 'startup entry call')
+st=ins_after_in(st, r'^([ \t]*)cur->func\(cur->arg\);',
+                ['nabu_mark_show((int)cur->subsystem);'], 'startup entry done')
 # The digits said 26 (mac_policy_init) but 27 (PMAP_ACTIVATE_KERNEL) never came.
 # Split the ten lines in between: 45 = mac_policy_init returned, 46 = mach_ipc done.
 st=ins_after_in(st, r'^([ \t]*)mac_policy_init\(\);', ['NABU_MARK(45);'], 'mac_policy_init done')
