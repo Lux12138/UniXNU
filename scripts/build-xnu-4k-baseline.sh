@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
@@ -12,6 +12,66 @@ LIBDISPATCH_TAG=${UNIXNU_LIBDISPATCH_TAG:-libdispatch-1477.100.9}
 AVAILABILITY_TAG=${UNIXNU_AVAILABILITYVERSIONS_TAG:-AvailabilityVersions-141.1}
 if [ ! -d refer/xnu/.git ]; then
   git clone --depth 1 --branch "$XNU_TAG" https://github.com/apple-oss-distributions/xnu.git refer/xnu
+
+# --- nabu: early checkpoint markers (diagnostic only) ---
+if [ -d refer/xnu/osfmk/arm ]; then
+  cat > refer/xnu/osfmk/arm/nabu_early_mark.h <<'MKH'
+void nabu_mark_init(const unsigned long long *video);
+void nabu_mark(int n);
+#define NABU_MARK(n) nabu_mark(n)
+MKH
+  cat > refer/xnu/osfmk/arm/nabu_early_mark.c <<'MKC'
+#include "nabu_early_mark.h"
+#include <stddef.h>
+static volatile unsigned int *g_fb = NULL;
+static unsigned long long g_row = 0, g_px = 0, g_w = 0, g_h = 0;
+static int g_slot = 0;
+static void fill(unsigned int x0, unsigned int y0, unsigned int w, unsigned int h, unsigned int c)
+{
+  unsigned int x, y, xe = x0 + w, ye = y0 + h;
+  if (xe > g_w) { xe = g_w; }
+  if (ye > g_h) { ye = g_h; }
+  for (y = y0; y < ye; y++) { for (x = x0; x < xe; x++) { g_fb[(unsigned long long)y * g_px + x] = c; } }
+}
+void nabu_mark_init(const unsigned long long *v)
+{
+  g_fb = NULL; g_row = 0; g_px = 0; g_w = 0; g_h = 0; g_slot = 0;
+  if (v[0] == 0 || v[1] == 0 || v[2] == 0 || v[3] == 0 || v[4] != 32) { return; }
+  if (v[2] > 8192 || v[3] > 8192) { return; }
+  g_fb = (volatile unsigned int *)(unsigned long)v[0];
+  g_row = v[1]; g_px = v[1] / 4;
+  g_w = (unsigned int)v[2]; g_h = (unsigned int)v[3];
+  fill(0, 0, g_w, 112, 0xFF000000);
+}
+void nabu_mark(int n)
+{
+  static const unsigned int colors[9] = {0,0xFFFFFFFF,0xFFFFFF00,0xFF00FFFF,0xFF00FF00,0xFFFF00FF,0xFFFF8000,0xFF0000FF,0xFFFF0000};
+  if (g_fb == NULL || n < 1 || n > 8 || g_slot >= 8) { return; }
+  fill(32 + (unsigned int)g_slot * 64, 32, 48, 48, colors[n]);
+  g_slot++;
+}
+MKC
+  grep -q nabu_early_mark refer/xnu/osfmk/conf/files.arm64 || \
+    printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> refer/xnu/osfmk/conf/files.arm64
+  python3 - refer/xnu/osfmk/arm/arm_init.c <<'MKP'
+import io,sys
+p=sys.argv[1]
+s=io.open(p,encoding='utf-8').read()
+if '#include <arm/nabu_early_mark.h>' not in s:
+    s=s.replace('#include <pexpert/arm/consistent_debug.h>','#include <pexpert/arm/consistent_debug.h>\n#include <arm/nabu_early_mark.h>',1)
+if 'NABU_MARK(1)' not in s:
+    a='\tPE_init_platform(FALSE, args); /* Get platform expert set up */'
+    assert a in s, 'mark1 anchor'
+    s=s.replace(a,'\tnabu_mark_init(args->Video);\n\tNABU_MARK(1);\n'+a,1)
+if 'NABU_MARK(2)' not in s:
+    a='\tPE_create_console();'
+    assert a in s, 'mark2 anchor'
+    s=s.replace(a,'\tNABU_MARK(2);\n'+a+'\n\tNABU_MARK(3);',1)
+io.open(p,'w',encoding='utf-8',newline='').write(s)
+print('  marks inserted')
+MKP
+fi
+# --- end nabu markers ---
 fi
 if [ "$(git -C refer/xnu rev-parse HEAD)" != "$XNU_COMMIT" ]; then
   echo 'error: unexpected XNU reference revision' >&2
@@ -904,3 +964,4 @@ if [ "${XNU_SOURCE_CORECRYPTO14:-0}" = 1 ] && [ "$CRYPTO_BOOTSTRAP_MODE" = sourc
   python3 scripts/seal-source-crypto-kernel.py \
     build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/mach.development.bcm2837.unstripped.noctf
 fi
+
