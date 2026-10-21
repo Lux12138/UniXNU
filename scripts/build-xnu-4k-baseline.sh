@@ -13,6 +13,7 @@ AVAILABILITY_TAG=${UNIXNU_AVAILABILITYVERSIONS_TAG:-AvailabilityVersions-141.1}
 if [ ! -d refer/xnu/.git ]; then
   git clone --depth 1 --branch "$XNU_TAG" https://github.com/apple-oss-distributions/xnu.git refer/xnu
 
+fi
 # --- nabu: early checkpoint markers (diagnostic only) ---
 if [ -d refer/xnu/osfmk/arm ]; then
   cat > refer/xnu/osfmk/arm/nabu_early_mark.h <<'MKH'
@@ -72,7 +73,6 @@ print('  marks inserted')
 MKP
 fi
 # --- end nabu markers ---
-fi
 if [ "$(git -C refer/xnu rev-parse HEAD)" != "$XNU_COMMIT" ]; then
   echo 'error: unexpected XNU reference revision' >&2
   exit 1
