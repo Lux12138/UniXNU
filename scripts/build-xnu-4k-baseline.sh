@@ -408,6 +408,16 @@ ko=ins_after_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops
 # i.e. the ops array was never zeroed rather than a genuine double registration.
 ko=ins_before_in(ko, r'^([ \t]*)panic\("trying to register kobject',
                  ['nabu_mark_val(77);'], 'kobject duplicate panic')
+# mig_init() has five different panics; tag each so the panel names the one taken.
+for _num, _pat, _lbl in (
+    (71, r'^([ \t]*)panic\("the msgh_ids in mig_e\[\] aren.t valid!"\);', 'mig ids invalid'),
+    (72, r'^([ \t]*)panic\("mig subsystem %d \(%p\) replies are too large', 'mig reply too large'),
+    (73, r'^([ \t]*)panic\("multiple entries with the same msgh_id"\);', 'mig duplicate id'),
+    (74, r'^([ \t]*)panic\("the mig dispatch table is too small"\);', 'mig table too small'),
+    (75, r'^([ \t]*)panic\("kroutine must have precise size', 'mig kroutine size'),
+):
+    ko = ins_before_in(ko, _pat, ['nabu_mark_val(%d);' % _num], _lbl)
+
 # 81 immediately before the store, 60 immediately after it: the pair says whether
 # the fault is the store itself or something after it returned.
 ko=ins_before_in(ko, r'^([ \t]*)ipc_kobject_ops_array\[ops->iko_op_type\] = \*ops;',
