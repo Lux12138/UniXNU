@@ -53,7 +53,7 @@ def rw(p,f):
         print('  nabu pre-clean: reverted '+p)
 def arm(s):
     s=re.sub(r'^[ \t]*#include <arm/nabu_early_mark\.h>\n','',s,count=1,flags=re.M)
-    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map)\([^\n]*\);\n','',s,count=0,flags=re.M)
+    s=re.sub(r'^[ \t]*nabu_mark_(?:init|rebind|map|show)\([^\n]*\);\n','',s,count=0,flags=re.M)
     for n in range(1,65):
         s=re.sub(r'^[ \t]*NABU_MARK\('+str(n)+r'\);\n','',s,count=1,flags=re.M)
     return s
@@ -110,6 +110,7 @@ void nabu_mark_init(const unsigned long *video);
 void nabu_mark_rebind(const unsigned long *video);
 /* Map the video aperture ourselves once the VM is up and replay what we have. */
 void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h);
+void nabu_mark_show(int n);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -208,6 +209,14 @@ static int max_hit(void)
     if (g_hits & (1ULL << (n - 1))) { m = n; }
   }
   return m;
+}
+/* Show a live number without recording a checkpoint: used inside the startup
+ * scheduler loop, where the value is data (the subsystem being brought up), not
+ * a fixed checkpoint id. */
+void nabu_mark_show(int n)
+{
+  if (g_fb == NULL) { return; }
+  draw_number(32, 120, n, 16);
 }
 static void draw_all(void)
 {
@@ -352,6 +361,13 @@ io.open(pep,'w',encoding='utf-8',newline='').write(pe)
 st=io.open(stp,encoding='utf-8').read()
 st=add_include(st, '#include <pexpert/pexpert.h>')
 st=ins_body_start(st, r'^kernel_bootstrap\(void\)\n\{\n', ['NABU_MARK(8);'], 'kernel_bootstrap')
+# kernel_startup_initialize_upto() walks the __startup table and calls each entry.
+# Show the subsystem id of the entry being run: whatever is on screen when it dies
+# is the subsystem that faulted.
+st=ins_before_in(st, r'^([ \t]*)while \(cur < startup_entries_end && cur->subsystem <= upto\) \{$',
+                 ['NABU_MARK(50);'], 'startup loop entry')
+st=ins_before_in(st, r'^([ \t]*)cur->func\(cur->arg\);',
+                 ['nabu_mark_show((int)cur->subsystem);'], 'startup entry call')
 # The digits said 26 (mac_policy_init) but 27 (PMAP_ACTIVATE_KERNEL) never came.
 # Split the ten lines in between: 45 = mac_policy_init returned, 46 = mach_ipc done.
 st=ins_after_in(st, r'^([ \t]*)mac_policy_init\(\);', ['NABU_MARK(45);'], 'mac_policy_init done')
