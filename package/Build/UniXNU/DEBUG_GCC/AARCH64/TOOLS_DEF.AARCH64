@@ -1,0 +1,190 @@
+APP_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+APP_FAMILY = GCC
+APP_FLAGS = 
+
+ASL_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASL_FAMILY = GCC
+ASL_FLAGS = 
+ASL_OUTFLAGS = -p
+ASL_PATH = iasl
+
+ASLCC_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASLCC_FAMILY = GCC
+ASLCC_FLAGS = -x c -include AutoGen.h -fshort-wchar -fno-lto
+ASLCC_PATH = aarch64-linux-gnu-gcc
+
+ASLDLINK_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASLDLINK_FAMILY = GCC
+ASLDLINK_FLAGS = -Wl,--emit-relocs -nostdlib -Wl,--gc-sections -u $(IMAGE_ENTRY_POINT) -Wl,-e,$(IMAGE_ENTRY_POINT),-Map,$(DEST_DIR_DEBUG)/$(BASE_NAME).map -Wl,--entry,ReferenceAcpiTable -u $(IMAGE_ENTRY_POINT) -Wl,--defsym=PECOFF_HEADER_SIZE=0 -Wl,--script=$(EDK_TOOLS_PATH)/Scripts/GccBase.lds -z common-page-size=0x20 -Wl,--fatal-warnings -Wl,-z,noexecstack -Wl,-z,notext
+ASLDLINK_PATH = aarch64-linux-gnu-gcc
+
+ASLPP_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASLPP_FAMILY = GCC
+ASLPP_FLAGS = -x c -E -include AutoGen.h
+ASLPP_PATH = aarch64-linux-gnu-gcc
+
+ASM_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASM_FAMILY = GCC
+ASM_FLAGS = $(PLATFORM_FLAGS) -c -x assembler -mlittle-endian
+ASM_PATH = aarch64-linux-gnu-gcc
+
+ASMLINK_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+ASMLINK_FAMILY = GCC
+ASMLINK_FLAGS = /nologo /tiny
+ASMLINK_PATH = bin16\link16.exe
+
+BROTLI_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+BROTLI_FAMILY = GCC
+BROTLI_GUID = 3D532050-5CDA-4FD0-879E-0F7F630D5AFB
+BROTLI_PATH = BrotliCompress
+
+CARGO_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+CARGO_FAMILY = GCC
+CARGO_PATH = cargo
+
+CARGOMAKE_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+CARGOMAKE_FAMILY = GCC
+CARGOMAKE_FLAGS = --cwd /mnt/c/Users/Administrator/Documents/UniXNU/package -e CARGO_TARGET_DIR=$(DEBUG_DIR) -p development -e TARGET_TRIPLE=$(TARGET_TRIPLE)
+
+CC_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+CC_FAMILY = GCC
+CC_FLAGS = $(PLATFORM_FLAGS) -g -Os -fshort-wchar -fno-builtin -fno-strict-aliasing -Wall -Werror -Wno-array-bounds -include AutoGen.h -fno-common -fstack-protector -ffunction-sections -fdata-sections -DSTRING_ARRAY_NAME=$(BASE_NAME)Strings -g -Os -fshort-wchar -fno-builtin -fno-strict-aliasing -Wall -Werror -Wno-array-bounds -include AutoGen.h -fno-common -fstack-protector -mlittle-endian -fno-short-enums -fverbose-asm -funsigned-char  -ffunction-sections -fdata-sections -Wno-address -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-pic -fno-pie -ffixed-x18 -mstack-protector-guard=global -mcmodel=small -flto
+CC_PATH = aarch64-linux-gnu-gcc
+CC_XIPFLAGS = -mstrict-align -mgeneral-regs-only
+
+CRC32_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+CRC32_FAMILY = GCC
+CRC32_GUID = FC1BCDB0-7D31-49AA-936A-A4600D9DD083
+CRC32_PATH = GenCrc32
+
+DEPS_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+DEPS_FAMILY = GCC
+DEPS_FLAGS = -MMD -MF $@.deps
+
+DLINK_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+DLINK_FAMILY = GCC
+DLINK_FLAGS = -Wl,--emit-relocs -nostdlib -Wl,--gc-sections -u $(IMAGE_ENTRY_POINT) -Wl,-e,$(IMAGE_ENTRY_POINT),-Map,$(DEST_DIR_DEBUG)/$(BASE_NAME).map -z common-page-size=0x1000 -Wl,--fatal-warnings -Wl,-z,noexecstack -Wl,-z,notext -flto -Os -L$(WORKSPACE)/BaseTools/Bin/GccLto -llto-aarch64 -Wl,-plugin-opt=-pass-through=-llto-aarch64 -Wno-lto-type-mismatch -z common-page-size=0x1000
+DLINK_PATH = aarch64-linux-gnu-gcc
+DLINK_XIPFLAGS = -z common-page-size=0x20
+
+DLINK2_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+DLINK2_FAMILY = GCC
+DLINK2_FLAGS = -Wl,--script=$(EDK_TOOLS_PATH)/Scripts/GccBase.lds -Wl,--defsym=PECOFF_HEADER_SIZE=0x228 -Wno-error
+
+DTC_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+DTC_FAMILY = GCC
+DTC_FLAGS = -H epapr
+DTC_PATH = dtc
+
+DTCPP_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+DTCPP_FAMILY = GCC
+DTCPP_FLAGS = -E -x assembler-with-cpp -imacros AutoGen.h -nostdinc -undef
+DTCPP_PATH = cpp
+
+GENFW_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+GENFW_FAMILY = GCC
+GENFW_FLAGS = 
+GENFW_PATH = GenFw
+
+GENFWHII_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+GENFWHII_FAMILY = GCC
+GENFWHII_FLAGS = --hiibinpackage
+
+LZMA_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+LZMA_FAMILY = GCC
+LZMA_GUID = EE4E5898-3914-4259-9D6E-DC7BD79403CF
+LZMA_PATH = LzmaCompress
+
+LZMAF86_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+LZMAF86_FAMILY = GCC
+LZMAF86_GUID = D42AE6BD-1352-4bfb-909A-CA72A6EAE889
+LZMAF86_PATH = LzmaF86Compress
+
+
+NASM_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+NASM_FAMILY = GCC
+NASM_PATH = nasm
+
+NASMB_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+NASMB_FAMILY = GCC
+NASMB_FLAGS = -f bin
+
+OBJCOPY_ADDDEBUGFLAG = --add-gnu-debuglink="$(DEBUG_DIR)/$(MODULE_NAME).debug"
+OBJCOPY_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+OBJCOPY_FAMILY = GCC
+OBJCOPY_FLAGS = objcopy not needed for
+OBJCOPY_PATH = echo
+OBJCOPY_STRIPFLAG = --strip-unneeded -R .eh_frame
+
+OPTROM_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+OPTROM_FAMILY = GCC
+OPTROM_FLAGS = -e
+OPTROM_PATH = EfiRom
+
+PARALLELLZMA_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+PARALLELLZMA_FAMILY = GCC
+PARALLELLZMA_GUID = BD9921EA-ED91-404A-8B2F-B4D724747C8C
+PARALLELLZMA_PATH = LzmaCompress
+
+PKCS7SIGN_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+PKCS7SIGN_FAMILY = GCC
+PKCS7SIGN_GUID = 4AAFD29D-68DF-49EE-8AA9-347D375665A7
+PKCS7SIGN_PATH = Pkcs7Sign
+
+PLATFORM_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+PLATFORM_FAMILY = GCC
+PLATFORM_FLAGS = 
+
+PP_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+PP_FAMILY = GCC
+PP_FLAGS = $(PLATFORM_FLAGS) -E -x assembler-with-cpp -include AutoGen.h
+PP_PATH = aarch64-linux-gnu-gcc
+
+RC_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+RC_FAMILY = GCC
+RC_FLAGS = -I binary -O elf64-littleaarch64 -B aarch64     --rename-section .data=.hii --add-section .note.gnu.property=$(WORKSPACE)/BaseTools/Bin/GnuNoteBti.bin --set-section-flags .note.gnu.property=alloc,readonly
+RC_PATH = aarch64-linux-gnu-objcopy
+
+RSA2048SHA256SIGN_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+RSA2048SHA256SIGN_FAMILY = GCC
+RSA2048SHA256SIGN_GUID = A7717414-C616-4977-9420-844712A735BF
+RSA2048SHA256SIGN_PATH = Rsa2048Sha256Sign
+
+RUST_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+RUST_FAMILY = GCC
+RUST_FLAGS = 
+RUST_TARGET = debug
+
+SLINK_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+SLINK_FAMILY = GCC
+SLINK_PATH = aarch64-linux-gnu-gcc-ar
+
+SYMRENAME_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+SYMRENAME_FAMILY = GCC
+SYMRENAME_FLAGS = Symbol renaming not needed for
+SYMRENAME_PATH = echo
+
+TARGET_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+TARGET_FAMILY = GCC
+TARGET_TRIPLE = aarch64-unknown-uefi
+
+TIANO_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+TIANO_FAMILY = GCC
+TIANO_GUID = A31280AD-481E-41B6-95E8-127F4C984779
+TIANO_PATH = TianoCompress
+
+VFR_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+VFR_FAMILY = GCC
+VFR_FLAGS = -l -n
+VFR_PATH = VfrCompile
+
+VFRPP_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+VFRPP_FAMILY = GCC
+VFRPP_FLAGS = $(PLATFORM_FLAGS) -x c -E -DVFRCOMPILE --include $(MODULE_NAME)StrDefs.h
+VFRPP_PATH = aarch64-linux-gnu-gcc
+
+VPDTOOL_BUILDRULEORDER = nasm asm Asm ASM S s nasmb asm16
+VPDTOOL_FAMILY = GCC
+VPDTOOL_GUID = 8C3D856A-9BE6-468E-850A-24F7A8D38E08
+VPDTOOL_PATH = BPDG
+

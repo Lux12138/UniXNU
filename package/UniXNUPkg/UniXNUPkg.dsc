@@ -55,4 +55,7 @@
   UniXNUPkg/Test/HelloPayload/HelloPayload.inf
   UniXNUPkg/Test/SampleDriver/SampleDriver.inf
   UniXNUPkg/Test/XnuTest/XnuTest.inf
+  # The XNU loader protocol lives in DarwinBoot, built from the drivers/ submodule.
+  # QEMU boots UniXNU as an application, so the driver has to be packaged next to it.
+  DarwinBootPkg/Driver/DarwinBoot.inf
 

@@ -309,9 +309,20 @@ int nabu_console_fb_ready(void) { return g_fb != NULL; }
  * invisible all along. */
 static unsigned int g_tx, g_ty;
 static int g_tx_init;
+/* PL011 UART at the QEMU virt address. Writing here costs nothing on real hardware
+ * (the address is unmapped there and the store is dropped by the fault handler), but it
+ * makes the same kprintf stream visible on a QEMU serial log -- which is what turns
+ * bring-up into a fast loop. */
+#define NABU_PL011_BASE 0x9000000UL
+static void nabu_uart_putc(char c)
+{
+  volatile unsigned int *dr = (volatile unsigned int *)NABU_PL011_BASE;
+  *dr = (unsigned int)(unsigned char)c;
+}
 void nabu_mark_putc(char c)
 {
   unsigned int scale = 3, cw = 6 * 3, ch = 8 * 3;
+  nabu_uart_putc(c);
   if (g_fb == NULL) { return; }
   if (!g_tx_init) { g_tx = 16; g_ty = 16; g_tx_init = 1; }
   if (c == '\n' || c == '\r') {

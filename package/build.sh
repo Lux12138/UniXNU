@@ -52,7 +52,10 @@ if [ ! -x "$EDK2/BaseTools/Source/C/bin/GenFw" ]; then
 fi
 
 export WORKSPACE=$BUILD_DIR
-export PACKAGES_PATH=$ROOT:$EDK2
+# drivers/ holds DarwinBoot and the other driver packages; the XNU loader
+# protocol comes from there.
+# DarwinBootPkg lives one level deeper than the other driver packages.
+export PACKAGES_PATH=$ROOT/../drivers/DarwinBoot:$ROOT/../drivers:$ROOT:$EDK2
 export EDK_TOOLS_PATH=$EDK2/BaseTools
 export CONF_PATH=$BUILD_DIR/Build/Conf
 export PYTHON_COMMAND=${PYTHON_COMMAND:-python3}
