@@ -648,6 +648,16 @@ if 'nabu_panic_hold' not in db:
 # the link fails on it.
            # Pull the line number out of the varargs and paint it, so the exact
            # assertion is identifiable even though only the format string is visible.
+           # Non-assert panics often carry names: "OSMetaClass: Kext %s class %s ..."
+           # passes the kext and class as the first two arguments. Paint the first one so
+           # the offending kext is identifiable without another build.
+           '\t\tif (!(str[0] == 37 && str[1] == 115 && str[2] == 58 && str[3] == 37 && str[4] == 100)) {\n'
+           '\t\t\tva_list _bp; const char *_arg0;\n'
+           '\t\t\tva_start(_bp, str);\n'
+           '\t\t\t_arg0 = va_arg(_bp, const char *);\n'
+           '\t\t\tva_end(_bp);\n'
+           '\t\t\tif (_arg0 != 0) { nabu_mark_text(_arg0, 1080); }\n'
+           '\t\t}\n'
            '\t\tif (str[0] == 37 && str[1] == 115 && str[2] == 58 && str[3] == 37 && str[4] == 100) {\n'
            '\t\t\tva_list _ap; const char *_f; int _line;\n'
            '\t\t\tva_start(_ap, str);\n'
