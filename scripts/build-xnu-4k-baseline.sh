@@ -684,6 +684,10 @@ if 'nabu_panic_hold' not in db:
            '\t\t\t  nabu_mark_num("line=", (unsigned long)_line, 1200);\n'
            '\t\t\t  nabu_mark_num("x=", (unsigned long)_x, 1280);\n'
            '\t\t\t  nabu_mark_num("y=", (unsigned long)_y, 1360); }\n'
+           # ipc_kobject_set_kobjidx asserts index < mach_kobj_count; if that counter never
+           # got accumulated, every index fails. Show it alongside the assertion text.
+           '\t\t{ extern int mach_kobj_count;\n'
+           '\t\t  nabu_mark_num("kobjcnt=", (unsigned long)(unsigned)mach_kobj_count, 1440); }\n'
            '\t\t\tva_end(_ap);\n'
            '\t\t}\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
