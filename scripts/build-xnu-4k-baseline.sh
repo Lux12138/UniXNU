@@ -266,7 +266,9 @@ void nabu_mark_quad(int a, int b, int c, int d)
 void nabu_mark_val(int v)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 320 : 132), v, 20);
+  /* Separate row from nabu_mark_show: they used to share (32, g_h-320), so this one
+   * painted over the subsystem readout and a photo only ever showed the entry id. */
+  draw_number(32, (g_h > 900 ? g_h - 430 : 132), v, 20);
 }
 
 /* 5x7 glyphs, 5 bytes per character, bit0 = leftmost column of that row. */
