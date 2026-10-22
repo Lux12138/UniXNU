@@ -252,7 +252,9 @@ void nabu_mark_show(int n)
   within++;
   if (g_fb == NULL) { return; }
   draw_number(32, (g_h > 900 ? g_h - 320 : 132), n, 18);
-  draw_number(220, (g_h > 900 ? g_h - 320 : 132), within, 18);
+  /* x=320, not 220: draw_number clears 11*s px from x=32, which reached 252 at s=20
+   * and clipped this digit in half. */
+  draw_number(320, (g_h > 900 ? g_h - 320 : 132), within, 18);
 }
 /* Four values at once. One flash/photo cycle should answer several questions, so
  * every probe site can dump a small tuple instead of a single number. */
@@ -451,7 +453,9 @@ static void draw_all(void)
     }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
-  draw_number(32, (g_h > 900 ? g_h - 320 : 132), max_hit(), 20);
+  /* Own row: this shared (32, g_h-320) with nabu_mark_show subsystem, so the two
+   * painted over each other and a photo could not tell which number it was. */
+  draw_number(32, (g_h > 900 ? g_h - 370 : 132), max_hit(), 20);
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
