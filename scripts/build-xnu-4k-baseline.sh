@@ -652,11 +652,15 @@ if 'nabu_panic_hold' not in db:
            # passes the kext and class as the first two arguments. Paint the first one so
            # the offending kext is identifiable without another build.
            '\t\tif (!(str[0] == 37 && str[1] == 115 && str[2] == 58 && str[3] == 37 && str[4] == 100)) {\n'
-           '\t\t\tva_list _bp; const char *_arg0;\n'
+           '\t\t\tva_list _bp; const char *_a0, *_a1, *_a2;\n'
            '\t\t\tva_start(_bp, str);\n'
-           '\t\t\t_arg0 = va_arg(_bp, const char *);\n'
+           '\t\t\t_a0 = va_arg(_bp, const char *);\n'
+           '\t\t\t_a1 = va_arg(_bp, const char *);\n'
+           '\t\t\t_a2 = va_arg(_bp, const char *);\n'
            '\t\t\tva_end(_bp);\n'
-           '\t\t\tif (_arg0 != 0) { nabu_mark_text(_arg0, 1080); }\n'
+           '\t\t\tif (_a0 != 0) { nabu_mark_text(_a0, 1040); }\n'
+           '\t\t\tif (_a1 != 0) { nabu_mark_text(_a1, 1110); }\n'
+           '\t\t\tif (_a2 != 0) { nabu_mark_text(_a2, 1180); }\n'
            '\t\t}\n'
            '\t\tif (str[0] == 37 && str[1] == 115 && str[2] == 58 && str[3] == 37 && str[4] == 100) {\n'
            '\t\t\tva_list _ap; const char *_f; int _line;\n'
