@@ -125,6 +125,7 @@ void nabu_mark_show(int n);
 void nabu_mark_val(int v);
 void nabu_mark_quad(int a, int b, int c, int d);
 void nabu_mark_text(const char *s, unsigned int y);
+void nabu_mark_num(const char *label, unsigned long v, unsigned int y);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -294,6 +295,25 @@ static const unsigned char g_ascii7[96][5] = {
   {0,0x08,0x36,0x41,0},{0,0,0x7F,0,0},{0,0x41,0x36,0x08,0},{0x08,0x04,0x08,0x10,0x08}  /* { | } ~ */
 };
 
+/* Minimal unsigned-to-decimal for the panic hook: no libc in the kernel. */
+void nabu_mark_num(const char *label, unsigned long v, unsigned int y)
+{
+  char buf[32];
+  int i = 0, j;
+  unsigned long t = v;
+  if (g_fb == NULL) { return; }
+  while (label[i] != 0 && i < 24) { buf[i] = label[i]; i++; }
+  j = i;
+  {
+    char tmp[24];
+    int n = 0;
+    if (t == 0) { tmp[n++] = '0'; }
+    while (t > 0 && n < 22) { tmp[n++] = (char)('0' + (t % 10)); t /= 10; }
+    while (n > 0) { buf[j++] = tmp[--n]; }
+  }
+  buf[j] = 0;
+  nabu_mark_text(buf, y);
+}
 /* Draw a NUL-terminated string with the small font. Used at panic() time, where the
  * console does not exist yet and the only way to learn the message is to paint it. */
 void nabu_mark_text(const char *s, unsigned int y)
@@ -583,9 +603,10 @@ if 'nabu_panic_hold' not in db:
            '\t\t\t  _op = va_arg(_ap, const char *);\n'
            '\t\t\t  _y = va_arg(_ap, unsigned long long);\n'
            '\t\t\t  (void)_cond; (void)_op;\n'
-           '\t\t\t  /* assert3u passes x and y; show x (the offending value) and y. */\n'
-           '\t\t\t  nabu_mark_quad((int)(_x % 100), (int)((_x / 100) % 100),\n'
-           '\t\t\t      (int)(_y % 100), (int)(_line % 100)); }\n'
+           '\t\t\t  /* print the real numbers: line, then x and y */\n'
+           '\t\t\t  nabu_mark_num("line=", (unsigned long)_line, 1120);\n'
+           '\t\t\t  nabu_mark_num("x=", (unsigned long)_x, 1200);\n'
+           '\t\t\t  nabu_mark_num("y=", (unsigned long)_y, 1280); }\n'
            '\t\t\tva_end(_ap);\n'
            '\t\t}\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
