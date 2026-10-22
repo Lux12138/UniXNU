@@ -480,6 +480,14 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
     extern void (*PE_kputc)(char);
     PE_kputc = nabu_mark_putc;
   }
+  /* Independent proof that the PL011 write works: five bytes straight to the UART,
+   * bypassing kprintf entirely. Seeing "NABU\n" in the QEMU serial log means the sink is
+   * fine and any missing text is the kprintf path. */
+  nabu_uart_putc('N');
+  nabu_uart_putc('A');
+  nabu_uart_putc('B');
+  nabu_uart_putc('U');
+  nabu_uart_putc('\n');
 }
 
 MKC
