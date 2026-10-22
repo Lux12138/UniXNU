@@ -301,7 +301,7 @@ void nabu_mark_text(const char *s, unsigned int y)
   unsigned int x = 32, gx, gy, row;
   if (g_fb == NULL || s == NULL) { return; }
   /* Wipe the band: leftover UEFI text underneath made the glyphs unreadable. */
-  fill(0, y > 20 ? y - 12 : 0, g_w, 60, 0xFF000000);
+  fill(0, y > 20 ? y - 12 : 0, g_w, 90, 0xFF000000);
   for (; *s != 0; s++) {
     unsigned char c = (unsigned char)*s;
     if (c < 32 || c > 126) { c = 32; }
@@ -310,11 +310,11 @@ void nabu_mark_text(const char *s, unsigned int y)
       for (gy = 0; gy < 7; gy++) {
         row = glyph[gx];
         if (row & (1u << gy)) {
-          fill(x + gx * 3, y + gy * 3, 3, 3, 0xFF00FF00);
+          fill(x + gx * 5, y + gy * 5, 5, 5, 0xFF00FF00);
         }
       }
     }
-    x += 5 * 3;
+    x += 5 * 5;
     if (x > (g_w > 200 ? g_w - 20 : 600)) { return; }
   }
 }
