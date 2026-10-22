@@ -461,7 +461,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/libkern/c++/OSKext.cpp <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -813,25 +813,7 @@ if 'nabu state notification' not in us:
                     '/* nabu state notification: PM state item not ready this early */')
     io.open(usc,'w',encoding='utf-8',newline='').write(us)
 
-# updateLoadedKextSummaries() allocates a buffer, bzeroes it and fills in the loaded-kext
-# summary. The panel shows that write landing on an unmapped KVA:
-#     LR = OSKext::updateLoadedKextSummaries()+0x208, FAR = 0xfffffff8db8d6000
-# so the allocation handed back an address whose pages were never mapped. The summary is
-# diagnostic only and nothing in the boot path consumes it; return early instead of
-# faulting.
-osc=sys.argv[11]
-os_=io.open(osc,encoding='utf-8').read()
-if 'nabu kext summary' not in os_:
-    _m = re.search(r'(OSKext::updateLoadedKextSummaries\(\)\n\{\n)', os_)
-    if _m:
-        os_ = os_[: _m.end()] + ('\t/* nabu kext summary: the summary buffer comes back unmapped in this build;\n'
-                                 '\t * skip it rather than fault in bzero. */\n'
-                                 '\treturn;\n') + os_[_m.end():]
-        print('  OSKext.cpp: updateLoadedKextSummaries stubbed out')
-    else:
-        print('  OSKext.cpp: WARN updateLoadedKextSummaries anchor not found')
-    io.open(osc,'w',encoding='utf-8',newline='').write(os_)
-    print('  IOUserServer.cpp: %d state-notification asserts disabled' % _n)
+# (kext summary stub lives in patches/xnu/zzzz-nabu-kext-summary-stub.patch)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the

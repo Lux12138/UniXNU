@@ -1,0 +1,13 @@
+--- a/libkern/c++/OSKext.cpp
++++ b/libkern/c++/OSKext.cpp
+@@ -16329,6 +16329,10 @@
+ void
+ OSKext::updateLoadedKextSummaries(void)
+ {
++	/* nabu kext summary: updateLoadedKextSummaries() kallocs a summary buffer whose
++	 * pages come back unmapped in this build (FAR 0xfffffff8db8d6000, bzero faults).
++	 * The summary is diagnostic only and nothing in the boot path reads it. */
++	return;
+ 	kern_return_t result = KERN_FAILURE;
+ 	OSKextLoadedKextSummaryHeader *summaryHeader = NULL;
+ 	OSKextLoadedKextSummaryHeader *summaryHeaderAlloc = NULL;
