@@ -430,11 +430,11 @@ s = ins_before_in(s, r'^([ \t]*)PE_init_platform\(FALSE,[ \t]*args\);', ['NABU_M
 s = ins_after_in(s, r'^([ \t]*)arm_vm_init\(xmaxmem,[ \t]*args\);',
       ['nabu_mark_map(args->Video.v_baseAddr, args->Video.v_rowBytes, args->Video.v_width, args->Video.v_height);',
        'NABU_MARK(6);',
-       # Console as early as it can work: vcattach() is otherwise only reached from
-       # PE_init_iokit(), which runs after the mach-IPC round -- exactly the region that
-       # stays invisible. The kernel pmap exists by now, so this maps the framebuffer and
-       # every later kprintf, panic text included, reaches the panel.
-       'PE_init_printf(TRUE); /* UNIXNU: early screen console */'], 'arm_vm_init')
+       # NOTE: do NOT call PE_init_printf(TRUE) here. vcattach() leaves gc_ops only
+       # partly initialised at this stage, and the next gc_update_color() trips
+       # assert(gc_ops.update_color) in video_console.c:1226 -- an assertion our own
+       # early-console attempt created, not a kernel defect.
+       ], 'arm_vm_init')
 s = ins_before_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(3);'], 'PE_create_console before')
 s = ins_after_in(s, r'^([ \t]*)PE_create_console\(\);', ['NABU_MARK(4);'], 'PE_create_console after')
 s = ins_after_in(s, r'^([ \t]*)PE_init_platform\(TRUE,[ \t]*&BootCpuData\);', ['NABU_MARK(5);'], 'PE_init_platform TRUE')
