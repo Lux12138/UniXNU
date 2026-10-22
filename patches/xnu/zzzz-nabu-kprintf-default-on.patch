@@ -8,26 +8,23 @@
  #include <machine/machine_routines.h>
  #include <pexpert/pexpert.h>
  #include <kern/debug.h>
-@@ -20,7 +21,10 @@
+@@ -20,7 +21,7 @@
  // disable_serial_output disables kprintf() *and* unbuffered panic output.
  SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
  // disable_kprintf_output only disables kprintf().
 -SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
-+/* nabu: kprintf output defaults to ON. The ADT does carry boot-args with
-+ * -enable_kprintf_spam, but the kernel never picked it up, so the default is the
-+ * only reliable switch. Silence it later if the log becomes too loud. */
 +SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = false;
  // disable_iolog_serial_output only disables IOLog, controlled by
  // SERIALMODE_NO_IOLOG.
  SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
-@@ -68,6 +72,11 @@
+@@ -68,6 +69,11 @@
  		 */
  		PE_kputc = console_write_unbuffered;
  	}
-+	/* nabu: the serial/console sink above does not exist on this board, and this
-+	 * function runs AFTER arm_init has already mapped the framebuffer, so it would
-+	 * overwrite any earlier hook. Take the framebuffer sink last. */
-+	if (nabu_console_fb_ready()) { PE_kputc = nabu_mark_putc; }
++	/* nabu: unconditional. This runs before the framebuffer is mapped, so a
++	 * readiness check here never fired; nabu_mark_putc guards g_fb itself and also
++	 * tees to the PL011 UART. */
++	PE_kputc = nabu_mark_putc;
 +
  }
  STARTUP(KPRINTF, STARTUP_RANK_FIRST, PE_init_kprintf);
