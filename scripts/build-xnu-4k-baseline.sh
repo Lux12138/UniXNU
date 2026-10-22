@@ -439,7 +439,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -755,6 +755,21 @@ if 'nabu_mark_putc' not in pk:
     else:
         print('  pe_kprintf.c: WARN PE_kputc anchor not found')
     io.open(pkc,'w',encoding='utf-8',newline='').write(pk)
+
+# IOUserServer::start() creates three system-state notification items and asserts each
+# one succeeded:
+#     ret = me->StateNotificationItemCreate(gIOSystemStateSleepDescriptionKey, NULL);
+#     assert(kIOReturnSuccess == ret);          /* iokit/Kernel/IOUserServer.cpp:6924 */
+# The call fails this early because the power-management state item machinery is not up
+# yet. DriverKit user servers are not needed for the bring-up, so do not abort on it.
+usc=sys.argv[10]
+us=io.open(usc,encoding='utf-8').read()
+if 'nabu state notification' not in us:
+    _n = us.count('assert(kIOReturnSuccess == ret);')
+    us = us.replace('assert(kIOReturnSuccess == ret);',
+                    '/* nabu state notification: PM state item not ready this early */')
+    io.open(usc,'w',encoding='utf-8',newline='').write(us)
+    print('  IOUserServer.cpp: %d state-notification asserts disabled' % _n)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
