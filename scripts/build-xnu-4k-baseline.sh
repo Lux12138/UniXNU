@@ -564,7 +564,7 @@ if 'nabu_panic_hold' not in db:
            '\t\t    (int)((_ps >> 10) & 0x3F),\n'
            '\t\t    (int)((_ps >> 16) & 0xFF),\n'
            '\t\t    (int)((_ps >> 24) & 0xFF));\n'
-           '\t\tnabu_mark_text(str, (unsigned int)(g_h > 1200 ? g_h - 560 : 700));\n'
+           '\t\tnabu_mark_text(str, 1000);\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
