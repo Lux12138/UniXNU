@@ -1,3 +1,0 @@
-Arch=AARCH64
-BuildDir=/mnt/c/Users/Administrator/Documents/UniXNU/package/Build/UniXNU/DEBUG_GCC
-PlatformGuid=1C1F7C2E-7A84-4F7B-9C55-2B7E4C0F5A31

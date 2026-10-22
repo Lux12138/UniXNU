@@ -1,1 +1,0 @@
-/mnt/c/Users/Administrator/Documents/UniXNU/package/Build/UniXNU/DEBUG_GCC/AARCH64/UniXNUPkg/Driver/UniXNUDxe/UniXNUDxe/GNUmakefile

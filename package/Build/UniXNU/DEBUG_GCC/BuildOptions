@@ -1,3 +1,0 @@
-gCommandLineDefines: {'ARCH': 'AARCH64'}
-BuildOptionPcd: []
-Active Platform: /mnt/c/Users/Administrator/Documents/UniXNU/package/UniXNUPkg/UniXNUPkg.dsc

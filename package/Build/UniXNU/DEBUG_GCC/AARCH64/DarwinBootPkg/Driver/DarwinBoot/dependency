@@ -1,9 +1,0 @@
-
-
--include /mnt/c/Users/Administrator/Documents/UniXNU/package/Build/UniXNU/DEBUG_GCC/AARCH64/DarwinBootPkg/Driver/DarwinBoot/OUTPUT/AutoGen.obj.deps
-
--include /mnt/c/Users/Administrator/Documents/UniXNU/package/Build/UniXNU/DEBUG_GCC/AARCH64/DarwinBootPkg/Driver/DarwinBoot/OUTPUT/DarwinBoot.obj.deps
-
--include /mnt/c/Users/Administrator/Documents/UniXNU/package/Build/UniXNU/DEBUG_GCC/AARCH64/DarwinBootPkg/Driver/DarwinBoot/OUTPUT/Entry.obj.deps
-
-               
