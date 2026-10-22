@@ -126,6 +126,8 @@ void nabu_mark_val(int v);
 void nabu_mark_quad(int a, int b, int c, int d);
 void nabu_mark_text(const char *s, unsigned int y);
 void nabu_mark_num(const char *label, unsigned long v, unsigned int y);
+void nabu_mark_putc(char c);
+int nabu_console_fb_ready(void);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
 MKH
@@ -295,6 +297,43 @@ static const unsigned char g_ascii7[96][5] = {
   {0,0x08,0x36,0x41,0},{0,0,0x7F,0,0},{0,0x41,0x36,0x08,0},{0x08,0x04,0x08,0x10,0x08}  /* { | } ~ */
 };
 
+int nabu_console_fb_ready(void) { return g_fb != NULL; }
+/* Scrolling kprintf sink. The framebuffer is mapped by nabu_mark_map() long before
+ * vcattach() runs, so this can carry the real boot log through the region that has been
+ * invisible all along. */
+static unsigned int g_tx, g_ty;
+static int g_tx_init;
+void nabu_mark_putc(char c)
+{
+  unsigned int scale = 3, cw = 6 * 3, ch = 8 * 3;
+  if (g_fb == NULL) { return; }
+  if (!g_tx_init) { g_tx = 16; g_ty = 16; g_tx_init = 1; }
+  if (c == '\n' || c == '\r') {
+    g_tx = 16;
+    g_ty += ch;
+    if (g_ty > (g_h > 200 ? g_h - 40 : 600)) { g_ty = 16; }
+    return;
+  }
+  if (c < 32 || c > 126) { c = ' '; }
+  if (g_tx + cw > (g_w > 40 ? g_w - 16 : 600)) {
+    g_tx = 16;
+    g_ty += ch;
+    if (g_ty > (g_h > 200 ? g_h - 40 : 600)) { g_ty = 16; }
+  }
+  {
+    const unsigned char *glyph = g_ascii7[(unsigned char)c - 32];
+    unsigned int gx, gy, row;
+    for (gx = 0; gx < 5; gx++) {
+      for (gy = 0; gy < 7; gy++) {
+        row = glyph[gx];
+        if (row & (1u << gy)) {
+          fill(g_tx + gx * scale, g_ty + gy * scale, scale, scale, 0xFFC0C0C0);
+        }
+      }
+    }
+  }
+  g_tx += cw;
+}
 /* Minimal unsigned-to-decimal for the panic hook: no libc in the kernel. */
 void nabu_mark_num(const char *label, unsigned long v, unsigned int y)
 {
@@ -400,7 +439,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -635,6 +674,22 @@ if 'nabu lock verify off' not in lt:
     else:
         print('  lock_ticket.c: WARN verify anchor not found')
     io.open(ltc,'w',encoding='utf-8',newline='').write(lt)
+
+# Route kprintf characters to the framebuffer we already mapped. boot_progress can only
+# start after vcattach(); this works from the moment nabu_mark_map() runs, which is the
+# whole region that has stayed dark.
+pkc=sys.argv[9]
+pk=io.open(pkc,encoding='utf-8').read()
+if 'nabu_mark_putc' not in pk:
+    pk=add_include(pk, '#include <pexpert/pexpert.h>')
+    _pk = ('\tif (nabu_console_fb_ready()) { nabu_mark_putc(c); }\n')
+    m2=re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)
+    if m2:
+        pk = pk[:m2.end()] + _pk + pk[m2.end():]
+        print('  pe_kprintf.c: kprintf routed to the nabu framebuffer')
+    else:
+        print('  pe_kprintf.c: WARN PE_kputc anchor not found')
+    io.open(pkc,'w',encoding='utf-8',newline='').write(pk)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
