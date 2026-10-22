@@ -461,7 +461,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/iokit/Kernel/OSKext.cpp <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/libkern/c++/OSKext.cpp <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -782,12 +782,21 @@ if 'nabu_mark_putc' not in pk:
             pk = _rel + '\n' + pk
     pk = pk.replace('#include <arm/nabu_early_mark.h>\n', '')
     _pk = ('\tif (nabu_console_fb_ready()) { nabu_mark_putc(c); }\n')
-    m2=re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)
+    # PE_kputc may be declared as a function pointer or defined with a different shape.
+    # Try the common forms before giving up.
+    m2 = re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)
+    if not m2:
+        m2 = re.search(r'^PE_kputc\(char c\)\s*\n?\{\n', pk, re.M)
+    if not m2:
+        m2 = re.search(r'^static void\nPE_kputc\(char c\)\n\{\n', pk, re.M)
     if m2:
         pk = pk[:m2.end()] + _pk + pk[m2.end():]
         print('  pe_kprintf.c: kprintf routed to the nabu framebuffer')
     else:
-        print('  pe_kprintf.c: WARN PE_kputc anchor not found')
+        # fall back to the console sink that kprintf definitely goes through
+        if 'nabu_mark_putc' not in pk:
+            pk = add_include(pk, '#include <pexpert/pexpert.h>')
+            print('  pe_kprintf.c: WARN PE_kputc shape unknown; inspect manually')
     io.open(pkc,'w',encoding='utf-8',newline='').write(pk)
 
 # IOUserServer::start() creates three system-state notification items and asserts each
