@@ -364,6 +364,11 @@ void nabu_mark_text(const char *s, unsigned int y)
   unsigned int left = 16;
   unsigned int per_line, len;
   if (g_fb == NULL || s == NULL) { return; }
+  /* A panic argument can be a junk pointer. Reading it here would replace the real panic
+   * with a data abort inside this function (seen as _nabu_mark_text+0x140, FAR=0x318).
+   * Only accept pointers that are clearly in the kernel's own address space. */
+  if ((unsigned long)s < 0xFFFFFFF000000000UL) { return; }
+  if (((unsigned long)s >> 48) != 0xFFFFUL) { return; }
 
   /* Wipe the band first: leftover UEFI text underneath made glyphs unreadable. */
   fill(0, y > 20 ? y - 12 : 0, g_w, 10 * lh, 0xFF000000);
