@@ -468,7 +468,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/bsd/kern/bsd_init.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -819,6 +819,24 @@ if 'nabu state notification' not in us:
     us = us.replace('assert(kIOReturnSuccess == ret);',
                     '/* nabu state notification: PM state item not ready this early */')
     io.open(usc,'w',encoding='utf-8',newline='').write(us)
+
+# bsd_autoconf() prints "calling kminit" and then calls kminit(); the log stops inside it.
+# Mark before and after so we can tell "kminit never returned" from "returned but the next
+# step is silent".
+bic=sys.argv[11]
+bi=io.open(bic,encoding='utf-8').read()
+if 'NABU_MARK(61)' not in bi:
+    bi=add_include(bi, '#include <pexpert/pexpert.h>')
+    _b = bi.replace('\tkminit();',
+                    '\tNABU_MARK(61);\n'
+                    '\tkminit();\n'
+                    '\tNABU_MARK(62);', 1)
+    if _b != bi:
+        bi = _b
+        print('  bsd_init.c: marks 61/62 around kminit()')
+    else:
+        print('  bsd_init.c: WARN kminit anchor not found')
+    io.open(bic,'w',encoding='utf-8',newline='').write(bi)
 
 # (kext summary stub lives in patches/xnu/zzzz-nabu-kext-summary-stub.patch)
 ko=io.open(kop,encoding='utf-8').read()
