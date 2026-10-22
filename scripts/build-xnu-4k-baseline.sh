@@ -826,7 +826,15 @@ if 'nabu state notification' not in us:
 bic=sys.argv[11]
 bi=io.open(bic,encoding='utf-8').read()
 if 'NABU_MARK(61)' not in bi:
-    bi=add_include(bi, '#include <pexpert/pexpert.h>')
+    # bsd/kern has no osfmk include root; add_include()'s <arm/...> form fails there.
+    _rel = '#include "../../osfmk/arm/nabu_early_mark.h"'
+    if _rel not in bi:
+        _m = re.search(r'^#include [<"][^\n]*$', bi, re.M)
+        if _m:
+            bi = bi[:_m.end()] + '\n' + _rel + bi[_m.end():]
+        else:
+            bi = _rel + '\n' + bi
+    bi = bi.replace('#include <arm/nabu_early_mark.h>\n', '')
     _b = bi.replace('\tkminit();',
                     '\tNABU_MARK(61);\n'
                     '\tkminit();\n'
