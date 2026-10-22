@@ -8,16 +8,21 @@
  #include <machine/machine_routines.h>
  #include <pexpert/pexpert.h>
  #include <kern/debug.h>
-@@ -20,7 +21,7 @@
+@@ -18,9 +19,11 @@
+ SECURITY_READ_ONLY_LATE(PE_kputc_t) PE_kputc;
+ 
  // disable_serial_output disables kprintf() *and* unbuffered panic output.
- SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
+-SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
++/* nabu: kprintf() requires BOTH flags false; serial output here means the PE_kputc
++ * sink we install, which is our framebuffer + PL011 tee, not a real DBG2 UART. */
++SECURITY_READ_ONLY_LATE(bool) disable_serial_output = false;
  // disable_kprintf_output only disables kprintf().
 -SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
 +SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = false;
  // disable_iolog_serial_output only disables IOLog, controlled by
  // SERIALMODE_NO_IOLOG.
  SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
-@@ -68,6 +69,11 @@
+@@ -68,6 +71,11 @@
  		 */
  		PE_kputc = console_write_unbuffered;
  	}
