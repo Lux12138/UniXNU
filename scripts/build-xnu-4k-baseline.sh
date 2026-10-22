@@ -296,24 +296,46 @@ static const unsigned char g_ascii7[96][5] = {
 
 /* Draw a NUL-terminated string with the small font. Used at panic() time, where the
  * console does not exist yet and the only way to learn the message is to paint it. */
+#define NABU_TEXT_SCALE 6
 void nabu_mark_text(const char *s, unsigned int y)
 {
-  unsigned int x = 32, gx, gy, row;
+  unsigned int x, gx, gy, row, line;
+  unsigned int cw = 6 * NABU_TEXT_SCALE;   /* advance per character */
+  unsigned int left = 24;
+  unsigned int avail, per_line, len, i;
   if (g_fb == NULL || s == NULL) { return; }
-  for (; *s != 0; s++) {
-    unsigned char c = (unsigned char)*s;
-    if (c < 32 || c > 126) { c = 32; }
-    const unsigned char *glyph = g_ascii7[c - 32];
-    for (gx = 0; gx < 5; gx++) {
-      for (gy = 0; gy < 7; gy++) {
-        row = glyph[gx];
-        if (row & (1u << gy)) {
-          fill(x + gx * 3, y + gy * 3, 3, 3, 0xFF00FF00);
+
+  /* Wipe the band first: the panel still holds UEFI text there and overlapping glyphs
+   * made the previous attempt unreadable. */
+  fill(0, y > 20 ? y - 12 : 0, g_w, 8 * NABU_TEXT_SCALE + 24, 0xFF000000);
+
+  avail = (g_w > left + cw ? g_w - left - 8 : 600);
+  per_line = avail / cw;
+  if (per_line == 0) { per_line = 1; }
+
+  for (line = 0; line < 6; line++) {
+    len = 0;
+    x = left;
+    for (i = 0; i < per_line; i++) {
+      unsigned char c = (unsigned char)s[line * per_line + i];
+      const unsigned char *glyph;
+      if (c == 0) { break; }
+      if (c < 32 || c > 126) { c = 32; }
+      glyph = g_ascii7[c - 32];
+      for (gx = 0; gx < 5; gx++) {
+        for (gy = 0; gy < 7; gy++) {
+          row = glyph[gx];
+          if (row & (1u << gy)) {
+            fill(x + gx * NABU_TEXT_SCALE,
+                 y + line * (8 * NABU_TEXT_SCALE) + gy * NABU_TEXT_SCALE,
+                 NABU_TEXT_SCALE, NABU_TEXT_SCALE, 0xFF00FF00);
+          }
         }
       }
+      x += cw;
+      len++;
     }
-    x += 5 * 3;
-    if (x > (g_w > 200 ? g_w - 20 : 600)) { return; }
+    if (len < per_line) { return; }
   }
 }
 static void draw_all(void)
@@ -562,7 +584,7 @@ if 'nabu_panic_hold' not in db:
            '\t\t    (int)((_ps >> 10) & 0x3F),\n'
            '\t\t    (int)((_ps >> 16) & 0xFF),\n'
            '\t\t    (int)((_ps >> 24) & 0xFF));\n'
-           '\t\tnabu_mark_text(str, 700);\n'
+           '\t\tnabu_mark_text(str, (unsigned int)(g_h > 1200 ? g_h - 620 : 700));\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
