@@ -148,8 +148,8 @@ static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
 static void draw_all(void);   /* defined below; nabu_mark keeps the screen current */
-static unsigned long long g_hits = 0; /* bit n-1 set == checkpoint n was reached */
-#define NABU_MAX_MARK 64
+static unsigned long long g_hits[2] = { 0, 0 }; /* bit (n-1) of word (n-1)/64 */
+#define NABU_MAX_MARK 128
 static const unsigned int g_palette[8] = {
   0xFFFFFFFF, 0xFFFFFF00, 0xFF00FFFF, 0xFF00FF00,
   0xFFFF00FF, 0xFFFF8000, 0xFF0000FF, 0xFFFF0000
@@ -197,12 +197,12 @@ void nabu_mark_init(const unsigned long *v)
 {
   (void)v;
   g_fb = NULL; g_px = 0; g_w = 0; g_h = 0;
-  g_slot = 0; g_hits = 0;
+  g_slot = 0; g_hits[0] = 0; g_hits[1] = 0;
 }
 void nabu_mark(int n)
 {
   if (n < 1 || n > NABU_MAX_MARK) { return; }
-  g_hits |= (1ULL << (n - 1));
+  g_hits[(n - 1) >> 6] |= (1ULL << ((n - 1) & 63));
   if (g_fb == NULL) { return; }   /* RAM only until the screen is mapped */
   draw_all();                     /* keep the strip current, no replay needed */
 }
@@ -232,7 +232,7 @@ static int max_hit(void)
 {
   int n, m = 0;
   for (n = 1; n <= NABU_MAX_MARK; n++) {
-    if (g_hits & (1ULL << (n - 1))) { m = n; }
+    if (g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) { m = n; }
   }
   return m;
 }
@@ -416,19 +416,19 @@ static void draw_all(void)
      * late ones (45/46/60/...) would otherwise never appear on the strip. */
     int first = 1, total = 0;
     for (n = 1; n <= NABU_MAX_MARK; n++) {
-      if (g_hits & (1ULL << (n - 1))) { total++; }
+      if (g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) { total++; }
     }
     if (total > 24) {
       int seen = 0;
       for (n = 1; n <= NABU_MAX_MARK; n++) {
-        if (g_hits & (1ULL << (n - 1))) {
+        if (g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) {
           seen++;
           if (seen == total - 23) { first = n; break; }
         }
       }
     }
     for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
-      if ((g_hits & (1ULL << (n - 1))) == 0) { continue; }
+      if ((g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) == 0) { continue; }
       fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 400 : 32), 48, 48, g_palette[(n - 1) & 7]);
       g_slot++;
     }
