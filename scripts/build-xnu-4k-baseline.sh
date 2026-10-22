@@ -296,46 +296,26 @@ static const unsigned char g_ascii7[96][5] = {
 
 /* Draw a NUL-terminated string with the small font. Used at panic() time, where the
  * console does not exist yet and the only way to learn the message is to paint it. */
-#define NABU_TEXT_SCALE 6
 void nabu_mark_text(const char *s, unsigned int y)
 {
-  unsigned int x, gx, gy, row, line;
-  unsigned int cw = 6 * NABU_TEXT_SCALE;   /* advance per character */
-  unsigned int left = 24;
-  unsigned int avail, per_line, len, i;
+  unsigned int x = 32, gx, gy, row;
   if (g_fb == NULL || s == NULL) { return; }
-
-  /* Wipe the band first: the panel still holds UEFI text there and overlapping glyphs
-   * made the previous attempt unreadable. */
-  fill(0, y > 20 ? y - 12 : 0, g_w, 8 * NABU_TEXT_SCALE + 24, 0xFF000000);
-
-  avail = (g_w > left + cw ? g_w - left - 8 : 600);
-  per_line = avail / cw;
-  if (per_line == 0) { per_line = 1; }
-
-  for (line = 0; line < 6; line++) {
-    len = 0;
-    x = left;
-    for (i = 0; i < per_line; i++) {
-      unsigned char c = (unsigned char)s[line * per_line + i];
-      const unsigned char *glyph;
-      if (c == 0) { break; }
-      if (c < 32 || c > 126) { c = 32; }
-      glyph = g_ascii7[c - 32];
-      for (gx = 0; gx < 5; gx++) {
-        for (gy = 0; gy < 7; gy++) {
-          row = glyph[gx];
-          if (row & (1u << gy)) {
-            fill(x + gx * NABU_TEXT_SCALE,
-                 y + line * (8 * NABU_TEXT_SCALE) + gy * NABU_TEXT_SCALE,
-                 NABU_TEXT_SCALE, NABU_TEXT_SCALE, 0xFF00FF00);
-          }
+  /* Wipe the band: leftover UEFI text underneath made the glyphs unreadable. */
+  fill(0, y > 20 ? y - 12 : 0, g_w, 60, 0xFF000000);
+  for (; *s != 0; s++) {
+    unsigned char c = (unsigned char)*s;
+    if (c < 32 || c > 126) { c = 32; }
+    const unsigned char *glyph = g_ascii7[c - 32];
+    for (gx = 0; gx < 5; gx++) {
+      for (gy = 0; gy < 7; gy++) {
+        row = glyph[gx];
+        if (row & (1u << gy)) {
+          fill(x + gx * 3, y + gy * 3, 3, 3, 0xFF00FF00);
         }
       }
-      x += cw;
-      len++;
     }
-    if (len < per_line) { return; }
+    x += 5 * 3;
+    if (x > (g_w > 200 ? g_w - 20 : 600)) { return; }
   }
 }
 static void draw_all(void)
@@ -400,7 +380,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -584,35 +564,11 @@ if 'nabu_panic_hold' not in db:
            '\t\t    (int)((_ps >> 10) & 0x3F),\n'
            '\t\t    (int)((_ps >> 16) & 0xFF),\n'
            '\t\t    (int)((_ps >> 24) & 0xFF));\n'
-           '\t\tnabu_mark_text(str, (unsigned int)(g_h > 1200 ? g_h - 620 : 700));\n'
+           '\t\tnabu_mark_text(str, (unsigned int)(g_h > 1200 ? g_h - 560 : 700));\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
     io.open(dbc,'w',encoding='utf-8',newline='').write(db)
-
-# The invalid-ticket-lock panic is DEVELOPMENT/DEBUG only:
-#     #if DEVELOPMENT || DEBUG
-#     #define LCK_TICKET_VERIFY(lck) lck_ticket_verify(lck)
-#     #else
-#     #define LCK_TICKET_VERIFY(lck) ((void)0)
-# A production kernel never runs that check, so it cannot be what stops a boot on real
-# hardware. Turn the verification off for this bring-up build as well, so the kernel
-# proceeds and we learn what it actually cannot do.
-ltc=sys.argv[8]
-lt=io.open(ltc,encoding='utf-8').read()
-if 'nabu lock verify off' not in lt:
-    old_v = '''#if DEVELOPMENT || DEBUG
-#define HW_LCK_TICKET_VERIFY(lck)      hw_lck_ticket_verify(lck)'''
-    new_v = '''/* nabu lock verify off: DEVELOPMENT-only assertion; RELEASE kernels compile it out,
- * so it cannot be a real bring-up blocker. */
-#if 0
-#define HW_LCK_TICKET_VERIFY(lck)      hw_lck_ticket_verify(lck)'''
-    if old_v in lt:
-        lt = lt.replace(old_v, new_v, 1)
-        print('  lock_ticket.c: LCK_TICKET_VERIFY disabled')
-    else:
-        print('  lock_ticket.c: WARN verify anchor not found')
-    io.open(ltc,'w',encoding='utf-8',newline='').write(lt)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
