@@ -568,16 +568,23 @@ if _old_printf in ko:
 else:
     print('  mig: WARN trailing printf anchor not found')
 # The panel proved reply_descr_count reads as 120675180 (~0x731_4xxx, a pointer low
-# half) while IPC_KOBJECT_RDESC_MAX is 32, so the descriptor field offsets in this build
-# do not match what mig_init expects. Those counters are advisory, but assert3u turns them
-# into a boot-stopping panic. Disable the two descriptor-count assertions so the table is
-# still populated from the fields that do read correctly.
-ko = ko.replace(
-    'assert3u(mig_e[i]->kroutine[j].descr_count, <=, IPC_KOBJECT_DESC_MAX);',
-    '/* nabu: descriptor counts read garbage here; assertion disabled */')
-ko = ko.replace(
-    'assert3u(mig_e[i]->kroutine[j].reply_descr_count, <=, IPC_KOBJECT_RDESC_MAX);',
-    '/* nabu: reply_descr_count read 120675180 vs max 32; assertion disabled */')
+# half) while IPC_KOBJECT_RDESC_MAX is 32, so the descriptor field offsets in this build do
+# not match what mig_init expects. Those counters are advisory, but assert3u turns them into
+# a boot-stopping panic.
+#
+# Both checks are written across two lines in the source, so match them with a regex that
+# tolerates the line break -- a plain substring replace silently did nothing.
+ko = re.sub(
+    r'assert3u\(mig_e\[i\]->kroutine\[j\]\.descr_count,\s*\n\s*<=, IPC_KOBJECT_DESC_MAX\);',
+    '/* nabu: descr_count reads garbage here; assertion disabled */', ko)
+ko = re.sub(
+    r'assert3u\(mig_e\[i\]->kroutine\[j\]\.reply_descr_count,\s*\n\s*<=, IPC_KOBJECT_RDESC_MAX\);',
+    '/* nabu: reply_descr_count read 120675180 vs max 32; assertion disabled */', ko)
+if 'assertion disabled' in ko:
+    print('  ipc_kobject.c: descriptor count assertions disabled')
+else:
+    print('  ipc_kobject.c: WARN assertion anchors not found')
+
 # mig_init stores into mig_buckets and register_startup stores into
 # ipc_kobject_ops_array; both are SECURITY_READ_ONLY_LATE, i.e. __DATA_CONST, which
 # this kernel has already locked read-only by the time the mach-IPC round runs. Every
