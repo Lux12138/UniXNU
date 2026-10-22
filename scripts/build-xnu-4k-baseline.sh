@@ -850,6 +850,36 @@ if 'NABU_MARK(61)' not in bi:
         print('  bsd_init.c: marks 61/62 around kminit()')
     else:
         print('  bsd_init.c: WARN kminit anchor not found')
+
+    # bsd_autoconf() returns (probe 64 proved publishResource came back), yet the next
+    # visible line, "calling loopattach", never appears. Mark each step between them.
+    _c = bi.replace('\tbsd_autoconf();',
+                    '\tbsd_autoconf();\n'
+                    '\tNABU_MARK(65);', 1)
+    if _c != bi:
+        bi = _c
+        print('  bsd_init.c: mark 65 after bsd_autoconf()')
+    else:
+        print('  bsd_init.c: WARN bsd_autoconf anchor not found')
+
+    _d = bi.replace('\t\tdtrace_postinit();',
+                    '\t\tdtrace_postinit();\n'
+                    '\t\tNABU_MARK(66);', 1)
+    if _d != bi:
+        bi = _d
+        print('  bsd_init.c: mark 66 after dtrace_postinit()')
+    else:
+        print('  bsd_init.c: (dtrace_postinit not present, fine)')
+
+    _e = bi.replace('\t\tloopattach();',
+                    '\t\tNABU_MARK(67);\n'
+                    '\t\tloopattach();\n'
+                    '\t\tNABU_MARK(68);', 1)
+    if _e != bi:
+        bi = _e
+        print('  bsd_init.c: marks 67/68 around loopattach()')
+    else:
+        print('  bsd_init.c: (loopattach anchor not found)')
     io.open(bic,'w',encoding='utf-8',newline='').write(bi)
 
 # bsd_autoconf() ends with return IOKitBSDInit(), and probe 62 already proves kminit()
