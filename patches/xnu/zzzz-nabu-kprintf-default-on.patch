@@ -1,6 +1,14 @@
 --- a/pexpert/arm/pe_kprintf.c
 +++ b/pexpert/arm/pe_kprintf.c
-@@ -20,7 +20,10 @@
+@@ -6,6 +6,7 @@
+  *    arm platform expert debugging output initialization.
+  */
+ #include <stdarg.h>
++#include "../../osfmk/arm/nabu_early_mark.h"
+ #include <machine/machine_routines.h>
+ #include <pexpert/pexpert.h>
+ #include <kern/debug.h>
+@@ -20,7 +21,10 @@
  // disable_serial_output disables kprintf() *and* unbuffered panic output.
  SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
  // disable_kprintf_output only disables kprintf().
@@ -12,3 +20,15 @@
  // disable_iolog_serial_output only disables IOLog, controlled by
  // SERIALMODE_NO_IOLOG.
  SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
+@@ -68,6 +72,11 @@
+ 		 */
+ 		PE_kputc = console_write_unbuffered;
+ 	}
++	/* nabu: the serial/console sink above does not exist on this board, and this
++	 * function runs AFTER arm_init has already mapped the framebuffer, so it would
++	 * overwrite any earlier hook. Take the framebuffer sink last. */
++	if (nabu_console_fb_ready()) { PE_kputc = nabu_mark_putc; }
++
+ }
+ STARTUP(KPRINTF, STARTUP_RANK_FIRST, PE_init_kprintf);
+ 
