@@ -1,0 +1,28 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -79,6 +79,7 @@
+  * Version 2.0.
+  */
+ 
++#include "../../osfmk/arm/nabu_early_mark.h"
+ #include <sys/param.h>
+ #include <sys/filedesc.h>
+ #include <sys/kernel.h>
+@@ -801,6 +802,7 @@
+ 
+ 	bsd_init_kprintf("calling bsd_autoconf\n");
+ 	bsd_autoconf();
++	NABU_MARK(65);
+ 
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
+@@ -1104,7 +1106,9 @@
+ bsd_autoconf(void)
+ {
+ 	kprintf("bsd_autoconf: calling kminit\n");
++	NABU_MARK(61);
+ 	kminit();
++	NABU_MARK(62);
+ 
+ 	/*
+ 	 * Early startup for bsd pseudodevices.
