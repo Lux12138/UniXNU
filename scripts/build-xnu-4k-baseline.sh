@@ -357,24 +357,41 @@ void nabu_mark_num(const char *label, unsigned long v, unsigned int y)
  * console does not exist yet and the only way to learn the message is to paint it. */
 void nabu_mark_text(const char *s, unsigned int y)
 {
-  unsigned int x = 32, gx, gy, row;
+  unsigned int x, gx, gy, row, line, i;
+  unsigned int scale = 5;
+  unsigned int cw = 6 * 5;
+  unsigned int lh = 9 * 5;
+  unsigned int left = 16;
+  unsigned int per_line, len;
   if (g_fb == NULL || s == NULL) { return; }
-  /* Wipe the band: leftover UEFI text underneath made the glyphs unreadable. */
-  fill(0, y > 20 ? y - 12 : 0, g_w, 90, 0xFF000000);
-  for (; *s != 0; s++) {
-    unsigned char c = (unsigned char)*s;
-    if (c < 32 || c > 126) { c = 32; }
-    const unsigned char *glyph = g_ascii7[c - 32];
-    for (gx = 0; gx < 5; gx++) {
-      for (gy = 0; gy < 7; gy++) {
-        row = glyph[gx];
-        if (row & (1u << gy)) {
-          fill(x + gx * 5, y + gy * 5, 5, 5, 0xFF00FF00);
+
+  /* Wipe the band first: leftover UEFI text underneath made glyphs unreadable. */
+  fill(0, y > 20 ? y - 12 : 0, g_w, 10 * lh, 0xFF000000);
+
+  per_line = (g_w > left + cw ? (g_w - left - 8) / cw : 30);
+  if (per_line == 0) { per_line = 1; }
+
+  for (line = 0; line < 8; line++) {
+    len = 0;
+    x = left;
+    for (i = 0; i < per_line; i++) {
+      unsigned char c = (unsigned char)s[line * per_line + i];
+      const unsigned char *glyph;
+      if (c == 0) { break; }
+      if (c < 32 || c > 126) { c = ' '; }
+      glyph = g_ascii7[c - 32];
+      for (gx = 0; gx < 5; gx++) {
+        for (gy = 0; gy < 7; gy++) {
+          row = glyph[gx];
+          if (row & (1u << gy)) {
+            fill(x + gx * scale, y + line * lh + gy * scale, scale, scale, 0xFF00FF00);
+          }
         }
       }
+      x += cw;
+      len++;
     }
-    x += 5 * 5;
-    if (x > (g_w > 200 ? g_w - 20 : 600)) { return; }
+    if (len < per_line) { return; }
   }
 }
 static void draw_all(void)
