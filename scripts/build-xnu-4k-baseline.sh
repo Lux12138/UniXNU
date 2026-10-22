@@ -658,9 +658,9 @@ if 'nabu_abort_hold' not in sl:
         sl,
         r'^handle_kernel_abort\(arm_saved_state_t \*state, uint32_t esr, vm_offset_t fault_addr,\n'
         r'    fault_status_t fault_code, vm_prot_t fault_type, expected_fault_handler_t expected_fault_handler\)\n\{\n',
-        ['nabu_mark_num("ESR=", (unsigned long)esr, 1180);',
-         'nabu_mark_num("FAR=", (unsigned long)fault_addr, 1260);',
-         'nabu_mark_num("PC=", (unsigned long)get_saved_state_pc(state), 1340);'],
+        ['nabu_mark_num("ESR=", (unsigned long)esr, 1560);',
+         'nabu_mark_num("FAR=", (unsigned long)fault_addr, 1650);',
+         'nabu_mark_num("PC=", (unsigned long)get_saved_state_pc(state), 1740);'],
         'kernel abort values')
     sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
                         [_hold], 'sleh abort hold')
