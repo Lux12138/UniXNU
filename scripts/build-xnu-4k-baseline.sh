@@ -251,20 +251,20 @@ void nabu_mark_show(int n)
   if (n != last_sys) { last_sys = n; within = 0; }
   within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 320 : 132), n, 18);
+  draw_number(32, (g_h > 900 ? g_h - 240 : 132), n, 18);
   /* x=320, not 220: draw_number clears 11*s px from x=32, which reached 252 at s=20
    * and clipped this digit in half. */
-  draw_number(320, (g_h > 900 ? g_h - 320 : 132), within, 18);
+  draw_number(320, (g_h > 900 ? g_h - 240 : 132), within, 18);
 }
 /* Four values at once. One flash/photo cycle should answer several questions, so
  * every probe site can dump a small tuple instead of a single number. */
 void nabu_mark_quad(int a, int b, int c, int d)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 380 : 132), a, 18);
-  draw_number(220, (g_h > 900 ? g_h - 380 : 132), b, 18);
-  draw_number(32, (g_h > 900 ? g_h - 260 : 300), c, 18);
-  draw_number(220, (g_h > 900 ? g_h - 260 : 300), d, 18);
+  draw_number(32, (g_h > 900 ? g_h - 350 : 132), a, 18);
+  draw_number(220, (g_h > 900 ? g_h - 350 : 132), b, 18);
+  draw_number(32, (g_h > 900 ? g_h - 460 : 300), c, 18);
+  draw_number(220, (g_h > 900 ? g_h - 460 : 300), d, 18);
 }
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
@@ -273,7 +273,7 @@ void nabu_mark_val(int v)
   if (g_fb == NULL) { return; }
   /* Separate row from nabu_mark_show: they used to share (32, g_h-320), so this one
    * painted over the subsystem readout and a photo only ever showed the entry id. */
-  draw_number(32, (g_h > 900 ? g_h - 430 : 132), v, 20);
+  draw_number(32, (g_h > 900 ? g_h - 580 : 132), v, 20);
 }
 
 /* 5x7 glyphs, 5 bytes per character, bit0 = leftmost column of that row. */
@@ -428,7 +428,7 @@ static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, g_h > 900 ? g_h - 420 : 0, g_w, 420, 0xFF000000);
+  fill(0, g_h > 900 ? g_h - 700 : 0, g_w, 700, 0xFF000000);
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
@@ -448,14 +448,14 @@ static void draw_all(void)
     }
     for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
       if ((g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) == 0) { continue; }
-      fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 400 : 32), 48, 48, g_palette[(n - 1) & 7]);
+      fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 690 : 32), 48, 48, g_palette[(n - 1) & 7]);
       g_slot++;
     }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
   /* Own row: this shared (32, g_h-320) with nabu_mark_show subsystem, so the two
    * painted over each other and a photo could not tell which number it was. */
-  draw_number(32, (g_h > 900 ? g_h - 370 : 132), max_hit(), 20);
+  draw_number(32, (g_h > 900 ? g_h - 120 : 132), max_hit(), 20);
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
