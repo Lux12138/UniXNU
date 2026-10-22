@@ -456,6 +456,13 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
   g_px = row / 4;
   g_w = (unsigned int)w; g_h = (unsigned int)h;
   draw_all();
+  /* Take over kprintf now that the framebuffer is writable. PE_init_kprintf() ran during
+   * STARTUP(KPRINTF) and pointed PE_kputc at the serial/console path, which does not exist
+   * on this board, so the kernel printed nothing at all. */
+  {
+    extern void (*PE_kputc)(char);
+    PE_kputc = nabu_mark_putc;
+  }
 }
 
 MKC
