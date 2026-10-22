@@ -682,7 +682,12 @@ if 'nabu lock verify off' not in lt:
 pkc=sys.argv[9]
 pk=io.open(pkc,encoding='utf-8').read()
 if 'nabu_mark_putc' not in pk:
+    # pexpert/arm has no osfmk include root; reach nabu_early_mark.h relatively.
     pk=add_include(pk, '#include <pexpert/pexpert.h>')
+    _rel = '#include "../../osfmk/arm/nabu_early_mark.h"'
+    if _rel not in pk:
+        pk = pk.replace('#include <pexpert/pexpert.h>',
+                        '#include <pexpert/pexpert.h>\n' + _rel, 1)
     _pk = ('\tif (nabu_console_fb_ready()) { nabu_mark_putc(c); }\n')
     m2=re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)
     if m2:
