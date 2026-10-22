@@ -852,7 +852,7 @@ if 'NABU_MARK(61)' not in bi:
 ioc=sys.argv[12]
 io_=io.open(ioc,encoding='utf-8').read()
 if 'NABU_MARK(63)' not in io_:
-    _rel = '#include "../../../osfmk/arm/nabu_early_mark.h"'
+    _rel = '#include "../../osfmk/arm/nabu_early_mark.h"'
     if _rel not in io_:
         _m = re.search(r'^#include [<"][^\n]*$', io_, re.M)
         io_ = io_[:_m.end()] + '\n' + _rel + io_[_m.end():]
