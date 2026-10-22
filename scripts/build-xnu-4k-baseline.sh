@@ -682,12 +682,17 @@ if 'nabu lock verify off' not in lt:
 pkc=sys.argv[9]
 pk=io.open(pkc,encoding='utf-8').read()
 if 'nabu_mark_putc' not in pk:
-    # pexpert/arm has no osfmk include root; reach nabu_early_mark.h relatively.
-    pk=add_include(pk, '#include <pexpert/pexpert.h>')
+    # pexpert/arm has no osfmk include root, so add_include()'s <arm/...> form does not
+    # resolve here (it failed twice). Insert the relative include by hand and never call
+    # add_include() for this file.
     _rel = '#include "../../osfmk/arm/nabu_early_mark.h"'
     if _rel not in pk:
-        pk = pk.replace('#include <pexpert/pexpert.h>',
-                        '#include <pexpert/pexpert.h>\n' + _rel, 1)
+        _m = re.search(r'^#include [<"][^\n]*$', pk, re.M)
+        if _m:
+            pk = pk[:_m.end()] + '\n' + _rel + pk[_m.end():]
+        else:
+            pk = _rel + '\n' + pk
+    pk = pk.replace('#include <arm/nabu_early_mark.h>\n', '')
     _pk = ('\tif (nabu_console_fb_ready()) { nabu_mark_putc(c); }\n')
     m2=re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)
     if m2:
