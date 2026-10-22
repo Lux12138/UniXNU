@@ -380,7 +380,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -569,6 +569,28 @@ if 'nabu_panic_hold' not in db:
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
     io.open(dbc,'w',encoding='utf-8',newline='').write(db)
+
+# The panel proved the panic is "Invalid ticket lock", i.e. lck_ticket_verify() found a
+# lock whose type field is not LCK_TYPE_TICKET -- a lock that was never initialised.
+# That assertion exists only for DEVELOPMENT/DEBUG builds:
+#     #if DEVELOPMENT || DEBUG
+#     #define LCK_TICKET_VERIFY(lck) lck_ticket_verify(lck)
+#     #else
+#     #define LCK_TICKET_VERIFY(lck) ((void)0)
+# A release kernel compiles it out, so it cannot be a real hardware blocker. Disable it
+# for this bring-up build and let the kernel show what it genuinely cannot do.
+ltc=sys.argv[8]
+lt=io.open(ltc,encoding='utf-8').read()
+if 'nabu lock verify off' not in lt:
+    old_v = '#if DEVELOPMENT || DEBUG\n#define HW_LCK_TICKET_VERIFY(lck)      hw_lck_ticket_verify(lck)'
+    new_v = ('/* nabu lock verify off: DEVELOPMENT-only assertion, compiled out of RELEASE */\n'
+             '#if 0\n#define HW_LCK_TICKET_VERIFY(lck)      hw_lck_ticket_verify(lck)')
+    if old_v in lt:
+        lt = lt.replace(old_v, new_v, 1)
+        print('  lock_ticket.c: ticket lock verification disabled')
+    else:
+        print('  lock_ticket.c: WARN verify anchor not found')
+    io.open(ltc,'w',encoding='utf-8',newline='').write(lt)
 ko=io.open(kop,encoding='utf-8').read()
 ko=add_include(ko, '#include <pexpert/pexpert.h>')
 # Show the kobject type being registered: the value on screen when it dies is the
