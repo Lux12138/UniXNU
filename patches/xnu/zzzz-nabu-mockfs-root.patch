@@ -1,0 +1,30 @@
+--- a/config/MASTER.arm64.bcm2837
++++ b/config/MASTER.arm64.bcm2837
+@@ -24,7 +24,7 @@
+ #  BSD_RELEASE =    [ BSD_BASE no_printf_str no_kprintf_str secure_kernel ]
+ #  BSD_DEV =        [ BSD_BASE config_netboot config_imageboot config_coredump pgo config_vnguard ]
+ #  BSD_DEBUG =      [ BSD_BASE config_netboot config_imageboot config_coredump pgo config_vnguard ]
+-#  FILESYS_BASE =   [ devfs fifo fs_compression config_protect config_mnt_rootsnap config_fse routefs namedstreams bindfs]
++#  FILESYS_BASE =   [ devfs fifo fs_compression config_protect config_mnt_rootsnap config_fse routefs namedstreams bindfs mockfs]
+ #  FILESYS_RELEASE= [ FILESYS_BASE ]
+ #  FILESYS_DEV =    [ FILESYS_BASE config_union_mounts fdesc ]
+ #  FILESYS_DEBUG =  [ FILESYS_BASE config_union_mounts fdesc ]
+--- a/iokit/Kernel/IOService.cpp
++++ b/iokit/Kernel/IOService.cpp
+@@ -5258,7 +5258,15 @@
+ 	bool unhide;
+ 
+ 	ioblockstoragedriverClass = OSMetaClass::getMetaClassWithName(gIOBlockStorageDriverKey);
+-	assert(ioblockstoragedriverClass);
++	/*
++	 * nabu: IOStorageFamily is not prelinked (NativeUfs is off), so this metaclass does not
++	 * exist and the root cannot be block media -- with mockfs + a RAM disk it is not, which
++	 * is the same situation image boot is in. Fall through with root = NULL instead of
++	 * panicking.
++	 */
++	if (!ioblockstoragedriverClass) {
++		root = NULL;
++	}
+ 
+ 	while (root) {
+ 		if (root->metaCast(ioblockstoragedriverClass)) {
