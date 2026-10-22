@@ -483,9 +483,15 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
     extern void (*PE_kputc)(char);
     PE_kputc = nabu_mark_putc;
   }
-  /* Map the QEMU PL011 so the UART tee has somewhere to write. On hardware this address
-   * is not the UART, the map fails and g_uart stays NULL, which makes the tee a no-op. */
-  {
+  /* Map the QEMU PL011 so the UART tee has somewhere to write -- but only under QEMU.
+   *
+   * 0x9000000 is PL011 on QEMU virt and something else entirely on SM8150. There the map
+   * succeeds and the store reaches real hardware, which kills the kernel inside the KPRINTF
+   * startup subsystem: checkpoint 50 prints, 60 never does.
+   *
+   * QEMU's ramfb is 800x600 while nabu's panel is 1600x2560, so the width identifies the
+   * platform before any timebase exists. */
+  if (w <= 1024 && h <= 1024) {
     vm_offset_t uva = ml_io_map_unmappable((vm_map_offset_t)NABU_PL011_PADDR,
                                            (vm_map_size_t)round_page(0x1000), VM_WIMG_IO);
     if (uva != 0) { g_uart = (volatile unsigned int *)(unsigned long)uva; }
