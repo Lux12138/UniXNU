@@ -221,11 +221,14 @@ static void draw_number(unsigned int x0, unsigned int y0, int value, unsigned in
 {
   /* Clear the whole two-digit cell first: without this a smaller value leaves the
    * previous tens digit behind and "4" reads as "54". */
-  fill(x0, y0, 7 * s, 5 * s, 0xFF000000);
+  fill(x0, y0, 11 * s, 5 * s, 0xFF000000);
   if (value < 0) { value = 0; }
-  if (value > 99) { value = 99; }
-  if (value >= 10) { draw_digit(x0, y0, value / 10, s); }
-  draw_digit(x0 + 4 * s, y0, value % 10, s);
+  if (value > 999) { value = 999; }
+  /* Three digits: checkpoint numbering passed 99 once the ulock marks (120..123) were
+   * added, and clamping at 99 made the panel lie about how far the kernel got. */
+  if (value >= 100) { draw_digit(x0, y0, value / 100, s); }
+  if (value >= 10) { draw_digit(x0 + 4 * s, y0, (value / 10) % 10, s); }
+  draw_digit(x0 + 8 * s, y0, value % 10, s);
 }
 /* Highest checkpoint reached: the number on screen, independent of the colours. */
 static int max_hit(void)
