@@ -1,0 +1,14 @@
+--- a/pexpert/arm/pe_kprintf.c
++++ b/pexpert/arm/pe_kprintf.c
+@@ -20,7 +20,10 @@
+ // disable_serial_output disables kprintf() *and* unbuffered panic output.
+ SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
+ // disable_kprintf_output only disables kprintf().
+-SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
++/* nabu: kprintf output defaults to ON. The ADT does carry boot-args with
++ * -enable_kprintf_spam, but the kernel never picked it up, so the default is the
++ * only reliable switch. Silence it later if the log becomes too loud. */
++SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = false;
+ // disable_iolog_serial_output only disables IOLog, controlled by
+ // SERIALMODE_NO_IOLOG.
+ SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
