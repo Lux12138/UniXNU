@@ -557,6 +557,7 @@ dbc=sys.argv[7]
 db=io.open(dbc,encoding='utf-8').read()
 if 'nabu_panic_hold' not in db:
     db=add_include(db, '#include <pexpert/pexpert.h>')
+    db=add_include(db, '#include <stdarg.h>')
     _ph = ('\t/* nabu_panic_hold: paint the format pointer and stop. */\n'
            '\t{\n'
            '\t\tunsigned long _ps = (unsigned long)str;\n'
@@ -565,6 +566,20 @@ if 'nabu_panic_hold' not in db:
            '\t\t    (int)((_ps >> 16) & 0xFF),\n'
            '\t\t    (int)((_ps >> 24) & 0xFF));\n'
            '\t\tnabu_mark_text(str, 1000);\n'
+           # assert() panics as panic("%s:%d Assertion failed: %s", file, line, cond).
+           # Pull the line number out of the varargs and paint it, so the exact
+           # assertion is identifiable even though only the format string is visible.
+           '\t\tif (__builtin_strstr(str, "Assertion failed") != 0) {\n'
+           '\t\t\tva_list _ap; const char *_f; int _line;\n'
+           '\t\t\tva_start(_ap, str);\n'
+           '\t\t\t_f = va_arg(_ap, const char *);\n'
+           '\t\t\t_line = va_arg(_ap, int);\n'
+           '\t\t\tva_end(_ap);\n'
+           '\t\t\tnabu_mark_quad((int)(_line / 10000) % 100,\n'
+           '\t\t\t    (int)(_line / 100) % 100,\n'
+           '\t\t\t    (int)_line % 100,\n'
+           '\t\t\t    (int)((((unsigned long)_f) >> 4) & 0x3F));\n'
+           '\t\t}\n'
            '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
