@@ -793,10 +793,10 @@ if 'nabu_mark_putc' not in pk:
         pk = pk[:m2.end()] + _pk + pk[m2.end():]
         print('  pe_kprintf.c: kprintf routed to the nabu framebuffer')
     else:
-        # fall back to the console sink that kprintf definitely goes through
-        if 'nabu_mark_putc' not in pk:
-            pk = add_include(pk, '#include <pexpert/pexpert.h>')
-            print('  pe_kprintf.c: WARN PE_kputc shape unknown; inspect manually')
+        # Do NOT call add_include() here: it inserts <arm/nabu_early_mark.h>, which does
+        # not resolve from pexpert/arm and breaks the build. The relative include is
+        # already added above; without the function anchor nothing else is needed.
+        print('  pe_kprintf.c: WARN PE_kputc shape unknown; routing not applied')
     io.open(pkc,'w',encoding='utf-8',newline='').write(pk)
 
 # IOUserServer::start() creates three system-state notification items and asserts each
