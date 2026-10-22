@@ -1,0 +1,13 @@
+--- a/bsd/net/skmem_sysctl.c
++++ b/bsd/net/skmem_sysctl.c
+@@ -31,6 +31,10 @@
+ __private_extern__ void
+ skmem_sysctl_init(void)
+ {
++	/* nabu skmem sysctl: skmem_get_sysctls_obj() returns an unmapped pointer in this
++	 * build (write to 0xfffffffbf004a000 faults at skmem_sysctl_init+0x18), so the
++	 * sysctl snapshot cannot be filled. It is statistics only. */
++	return;
+ 	// TCP values
+ 	skmem_sysctl *sysctls = skmem_get_sysctls_obj(NULL);
+ 	if (sysctls) {
