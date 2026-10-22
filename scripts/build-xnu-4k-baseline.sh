@@ -309,15 +309,16 @@ int nabu_console_fb_ready(void) { return g_fb != NULL; }
  * invisible all along. */
 static unsigned int g_tx, g_ty;
 static int g_tx_init;
-/* PL011 UART at the QEMU virt address. Writing here costs nothing on real hardware
- * (the address is unmapped there and the store is dropped by the fault handler), but it
- * makes the same kprintf stream visible on a QEMU serial log -- which is what turns
- * bring-up into a fast loop. */
-#define NABU_PL011_BASE 0x9000000UL
+/* PL011 UART at the QEMU virt physical address. It must be mapped before use: writing
+ * the physical address through the kernel VM faults (which is why the first attempt showed
+ * nothing). g_uart stays NULL on hardware where the mapping fails, and the tee becomes a
+ * no-op there. */
+#define NABU_PL011_PADDR 0x9000000UL
+static volatile unsigned int *g_uart = NULL;
 static void nabu_uart_putc(char c)
 {
-  volatile unsigned int *dr = (volatile unsigned int *)NABU_PL011_BASE;
-  *dr = (unsigned int)(unsigned char)c;
+  if (g_uart == NULL) { return; }
+  *g_uart = (unsigned int)(unsigned char)c;
 }
 void nabu_mark_putc(char c)
 {
@@ -480,8 +481,15 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
     extern void (*PE_kputc)(char);
     PE_kputc = nabu_mark_putc;
   }
+  /* Map the QEMU PL011 so the UART tee has somewhere to write. On hardware this address
+   * is not the UART, the map fails and g_uart stays NULL, which makes the tee a no-op. */
+  {
+    vm_offset_t uva = ml_io_map_unmappable((vm_map_offset_t)NABU_PL011_PADDR,
+                                           (vm_map_size_t)round_page(0x1000), VM_WIMG_IO);
+    if (uva != 0) { g_uart = (volatile unsigned int *)(unsigned long)uva; }
+  }
   /* Independent proof that the PL011 write works: five bytes straight to the UART,
-   * bypassing kprintf entirely. Seeing "NABU\n" in the QEMU serial log means the sink is
+   * bypassing kprintf entirely. Seeing "NABU" in the QEMU serial log means the sink is
    * fine and any missing text is the kprintf path. */
   nabu_uart_putc('N');
   nabu_uart_putc('A');
