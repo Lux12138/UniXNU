@@ -1,0 +1,32 @@
+--- a/bsd/kern/sys_ulock.c
++++ b/bsd/kern/sys_ulock.c
+@@ -66,6 +66,7 @@
+ 
+ #include <os/hash.h>
+ #include <sys/ulock.h>
++#include "../../osfmk/arm/nabu_early_mark.h"
+ 
+ /*
+  * How ulock promotion works:
+@@ -258,10 +259,13 @@
+ 	kprintf("%s>thread_max=%d, ull_hash_buckets=%d\n", __FUNCTION__, thread_max, ull_hash_buckets);
+ 	assert(ull_hash_buckets >= thread_max / 4);
+ 
++	NABU_MARK(120);
+ 	ull_bucket = zalloc_permanent(sizeof(ull_bucket_t) * ull_hash_buckets,
+ 	    ZALIGN_PTR);
++	NABU_MARK(121);
+ 	assert(ull_bucket != NULL);
+ 
++	NABU_MARK(122);
+ 	for (int i = 0; i < ull_hash_buckets; i++) {
+ 		queue_init(&ull_bucket[i].ulb_head);
+ #if ULL_TICKET_LOCK
+@@ -270,6 +274,7 @@
+ 		lck_spin_init(&ull_bucket[i].ulb_lock, &ull_lck_grp, NULL);
+ #endif /* ULL_TICKET_LOCK */
+ 	}
++	NABU_MARK(123);
+ }
+ STARTUP(EARLY_BOOT, STARTUP_RANK_FIRST, ulock_initialize);
+ 
