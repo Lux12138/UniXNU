@@ -651,6 +651,17 @@ if 'nabu_abort_hold' not in sl:
              '\t\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
              '\t\t}\n'
              '\t}\n')
+    # handle_kernel_abort() already holds the decoded esr and the faulting address far.
+    # Paint them directly: the generic panic text only shows its format string, so the
+    # values never reach the panel.
+    sl = ins_body_start(
+        sl,
+        r'^handle_kernel_abort\(arm_saved_state_t \*state, uint32_t esr, vm_offset_t fault_addr,\n'
+        r'    fault_status_t fault_code, vm_prot_t fault_type, expected_fault_handler_t expected_fault_handler\)\n\{\n',
+        ['nabu_mark_num("ESR=", (unsigned long)esr, 1180);',
+         'nabu_mark_num("FAR=", (unsigned long)fault_addr, 1260);',
+         'nabu_mark_num("PC=", (unsigned long)get_saved_state_pc(state), 1340);'],
+        'kernel abort values')
     sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
                         [_hold], 'sleh abort hold')
     io.open(slc,'w',encoding='utf-8',newline='').write(sl)
