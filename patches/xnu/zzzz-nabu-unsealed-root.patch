@@ -1,0 +1,15 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -935,8 +935,10 @@
+ 		require_rootauth = !imageboot_desired();
+ #endif // CONFIG_IMAGEBOOT
+ #elif !XNU_TARGET_OS_OSX
+-		/* Non MacOS */
+-		require_rootauth = TRUE;
++		/* nabu: a mockfs/RAM-disk root cannot present a sealed-root signature, so
++		 * requiring rootauth here guarantees "rootvp not authenticated after
++		 * mounting". Bring-up runs unsealed. */
++		require_rootauth = FALSE;
+ #endif // XNU_TARGET_OS_OSX && defined(__arm64__)
+ 
+ 		if (require_rootauth) {
