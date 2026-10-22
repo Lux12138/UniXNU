@@ -468,7 +468,7 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
 MKC
   grep -q nabu_early_mark .cache/xnu-work/osfmk/conf/files.arm64 || \
     printf 'osfmk/arm/nabu_early_mark.c\tstandard\n' >> .cache/xnu-work/osfmk/conf/files.arm64
-  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/bsd/kern/bsd_init.c <<'MKP'
+  python3 - .cache/xnu-work/osfmk/arm/arm_init.c .cache/xnu-work/osfmk/console/video_console.c .cache/xnu-work/osfmk/kern/startup.c .cache/xnu-work/pexpert/arm/pe_init.c .cache/xnu-work/osfmk/kern/ipc_kobject.c .cache/xnu-work/osfmk/arm64/sleh.c .cache/xnu-work/osfmk/kern/debug.c .cache/xnu-work/osfmk/kern/lock_ticket.c .cache/xnu-work/pexpert/arm/pe_kprintf.c .cache/xnu-work/iokit/Kernel/IOUserServer.cpp .cache/xnu-work/bsd/kern/bsd_init.c .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp <<'MKP'
 import io,re,sys
 p=sys.argv[1]; vcp=sys.argv[2]; stp=sys.argv[3]
 s=io.open(p,encoding='utf-8').read()
@@ -845,6 +845,27 @@ if 'NABU_MARK(61)' not in bi:
     else:
         print('  bsd_init.c: WARN kminit anchor not found')
     io.open(bic,'w',encoding='utf-8',newline='').write(bi)
+
+# bsd_autoconf() ends with return IOKitBSDInit(), and probe 62 already proves kminit()
+# returned. IOKitBSDInit() only does IOService::publishResource("IOBSD"), which triggers
+# driver matching -- the point where the IOSurface log appears and everything stops.
+ioc=sys.argv[12]
+io_=io.open(ioc,encoding='utf-8').read()
+if 'NABU_MARK(63)' not in io_:
+    _rel = '#include "../../../osfmk/arm/nabu_early_mark.h"'
+    if _rel not in io_:
+        _m = re.search(r'^#include [<"][^\n]*$', io_, re.M)
+        io_ = io_[:_m.end()] + '\n' + _rel + io_[_m.end():]
+    _b = io_.replace('\tIOService::publishResource("IOBSD");',
+                     '\tNABU_MARK(63);\n'
+                     '\tIOService::publishResource("IOBSD");\n'
+                     '\tNABU_MARK(64);', 1)
+    if _b != io_:
+        io_ = _b
+        print('  IOKitBSDInit.cpp: marks 63/64 around publishResource')
+    else:
+        print('  IOKitBSDInit.cpp: WARN publishResource anchor not found')
+    io.open(ioc,'w',encoding='utf-8',newline='').write(io_)
 
 # (kext summary stub lives in patches/xnu/zzzz-nabu-kext-summary-stub.patch)
 ko=io.open(kop,encoding='utf-8').read()
