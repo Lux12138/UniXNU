@@ -11,17 +11,12 @@
  #  FILESYS_DEBUG =  [ FILESYS_BASE config_union_mounts fdesc ]
 --- a/iokit/Kernel/IOService.cpp
 +++ b/iokit/Kernel/IOService.cpp
-@@ -5258,7 +5258,15 @@
- 	bool unhide;
- 
+@@ -5258,7 +5258,14 @@
  	ioblockstoragedriverClass = OSMetaClass::getMetaClassWithName(gIOBlockStorageDriverKey);
 -	assert(ioblockstoragedriverClass);
-+	/*
-+	 * nabu: IOStorageFamily is not prelinked (NativeUfs is off), so this metaclass does not
-+	 * exist and the root cannot be block media -- with mockfs + a RAM disk it is not, which
-+	 * is the same situation image boot is in. Fall through with root = NULL instead of
-+	 * panicking.
-+	 */
++	/* nabu: IOStorageFamily is not prelinked (NativeUfs is off), so this metaclass
++	 * does not exist and the root cannot be block media. With mockfs plus a RAM disk it
++	 * is not, which is the same situation image boot is in. */
 +	if (!ioblockstoragedriverClass) {
 +		root = NULL;
 +	}
