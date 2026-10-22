@@ -120,6 +120,9 @@ if [ -d .cache/xnu-work/osfmk/arm ]; then
 void nabu_mark_init(const unsigned long *video);
 void nabu_mark_rebind(const unsigned long *video);
 /* Map the video aperture ourselves once the VM is up and replay what we have. */
+#ifdef __cplusplus
+extern "C" {
+#endif
 void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsigned long h);
 void nabu_mark_show(int n);
 void nabu_mark_val(int v);
@@ -130,6 +133,9 @@ void nabu_mark_putc(char c);
 int nabu_console_fb_ready(void);
 void nabu_mark(int n);
 #define NABU_MARK(n) nabu_mark(n)
+#ifdef __cplusplus
+}
+#endif
 MKH
   cat > .cache/xnu-work/osfmk/arm/nabu_early_mark.c <<'MKC'
 #include "nabu_early_mark.h"
