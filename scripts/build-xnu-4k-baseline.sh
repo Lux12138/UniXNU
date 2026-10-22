@@ -567,9 +567,11 @@ if 'nabu_panic_hold' not in db:
            '\t\t    (int)((_ps >> 24) & 0xFF));\n'
            '\t\tnabu_mark_text(str, 1000);\n'
            # assert() panics as panic("%s:%d Assertion failed: %s", file, line, cond).
+# Match on the literal prefix instead of strstr: the kernel has no strstr and
+# the link fails on it.
            # Pull the line number out of the varargs and paint it, so the exact
            # assertion is identifiable even though only the format string is visible.
-           '\t\tif (__builtin_strstr(str, "Assertion failed") != 0) {\n'
+           '\t\tif (str[0] == 37 && str[1] == 115 && str[2] == 58 && str[3] == 37 && str[4] == 100) {\n'
            '\t\t\tva_list _ap; const char *_f; int _line;\n'
            '\t\t\tva_start(_ap, str);\n'
            '\t\t\t_f = va_arg(_ap, const char *);\n'
