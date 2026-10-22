@@ -120,6 +120,11 @@ def main():
         node('chosen', [('random-seed', os.urandom(64)),
                         *([('unique-chip-id', struct.pack('<Q', args.unique_chip_id)), ('chip-id', struct.pack('<I', args.chip_id))]
                           if args.unique_chip_id is not None else []),
+                        # pe_kprintf.c defaults disable_kprintf_output to true and only
+                        # clears it when -enable_kprintf_spam is present in boot-args.
+                        # Without this property the kernel prints nothing at all and
+                        # the boot log is invisible by design.
+                        ('boot-args', b'-enable_kprintf_spam\0'),
                         ('osenvironment', b'main\0'),
                         *([('certificate-production-status', struct.pack('<I', 0)), ('effective-production-status-ap', struct.pack('<I', 0)),
                            ('certificate-security-mode', struct.pack('<I', 1)), ('effective-security-mode-sep', struct.pack('<I', 1))]
