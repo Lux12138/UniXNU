@@ -16,6 +16,7 @@ board.toml. The disk images are attached read-only without mounting (macOS hdiut
 report prints the fastboot command, to be run by the user.
 """
 import hashlib
+import io
 import json
 import plistlib
 import re
@@ -37,18 +38,31 @@ def paths(ctx):
     return out, out / 'userdata-root.img', out / 'userdata-root.json'
 
 
-NXSB = b'NXSB'
+KOLY = b'koly'
 
 
-def is_bare_apfs(dmg):
-    """The SystemOS dmg is a plain APFS image, not a UDIF container."""
+def is_udif(dmg):
+    """Only a UDIF container needs unpacking; anything else is already a disk image.
+
+    The two components are different kinds of object. 044-76040-038.dmg (OS) is UDIF: bvxn chunks
+    at the front, a koly trailer at the back. 044-76034-038.dmg (SystemOS) is a sealed APFS volume
+    copied out whole -- file(1) reports APFS, 7z reports Type = APFS with SEALED_VOLUME, and its
+    first bytes are neither NXSB nor bvxn. The image just has to be carried across byte for byte,
+    so the test is "is this UDIF", not "can 7z open it".
+    """
     with open(dmg, 'rb') as handle:
-        return handle.read(4) == NXSB
+        head = handle.read(4)
+        handle.seek(-512, io.SEEK_END)
+        trailer = handle.read(4)
+    return head == b'bvxn' or head == b'bvx2' or trailer == KOLY
 
 
 def image_size(dmg):
-    if is_bare_apfs(dmg):
+    if not is_udif(dmg):
         return dmg.stat().st_size
+
+
+def image_size(dmg):
     if HOST == 'Darwin':
         info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)],
                              capture_output=True, check=True).stdout
@@ -71,7 +85,7 @@ def image_size(dmg):
 
 def attach(dmg):
     """Attach read-only without mounting; return the whole-disk device."""
-    if is_bare_apfs(dmg):
+    if not is_udif(dmg):
         return str(dmg)
     if HOST == 'Darwin':
         out = subprocess.run(['hdiutil', 'attach', '-nomount', '-readonly', '-noverify',
