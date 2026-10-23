@@ -1720,14 +1720,12 @@ fi
     test -f "$UFS_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$UFS_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $UFS_ARCHIVE"
-    # nabu: NativeUfsBlock derives from IOBlockStorageDevice, which lives in the
-    # IOStorageFamily kext rather than the kernel. audit-storage-interface.py compiles
-    # the real IOBlockStorageDevice.cpp with the kernel's own compile arguments into
-    # build/storage-abi/IOBlockStorageDevice-reference.o; linking that object supplies
-    # the base class, its vtable and gMetaClass so make-stage linking succeeds.
-    #
-    #
-    # supply the single instance at load time.
+    # NativeUfsBlock derives from IOBlockStorageDevice, which lives in the IOStorageFamily kext.
+    # In register-probe mode (XNU_NABU_UFS_REGISTER_PROBE=1) the class is not compiled at all, so
+    # nothing here needs those symbols. Enabling the real block driver needs the verified-root
+    # bundle -- see configs/nabu_defconfig's header for that gate chain -- so do not try to satisfy
+    # them by linking build/storage-abi/IOBlockStorageDevice-reference.o: it registers a second
+    # metaclass and OSMetaClass::postModLoad panics with a duplicate-class report.
   fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
