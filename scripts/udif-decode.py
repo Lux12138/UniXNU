@@ -1,22 +1,31 @@
 """Decode an Apple UDIF (.dmg) image on Linux, without hdiutil.
 
-UDIF is a container. A 512-byte "koly" trailer at the end of the file records where the compressed
-data fork and the XML property list live; the plist carries a base64 "blkx" blob that describes
-every chunk -- its compressed type, offset, packed length and unpacked length. The payload is a
-plain concatenation of those chunks.
+UDIF is a container. A 512-byte "koly" trailer at the end records where the compressed data fork
+and the XML property list live. The plist's resource-fork/blkx array holds one entry per partition
+("MBR", "Primary GPT Header", "Apple_HFS", ...), and each entry's Data is a binary mish table:
 
-Handled chunk types:
-  bvxn / 0x80000008  lzvn    -> lzfse -decode
-  bvx2 / 0x80000007  lzfse   -> lzfse -decode
-  bvx- / 0x80000005  bzip2   -> bz2
-  bvx$ / 0x80000004  zlib    -> zlib
-  0x00000001         raw     -> copied
-  0x00000000/2       zero    -> zeros
+    u32  'mish'
+    u32  version
+    u64  first_sector
+    u64  sector_count
+    u64  data_offset
+    u32  buffers_needed
+    u32  block_descriptors
+    u8   reserved[24]
+    run[block_descriptors]        40 bytes each:
+        u32 type, u32 comment, u64 sector, u64 sectors, u64 offset, u64 length
+
+Chunk types:
+  0x00000000 / 0x00000002  zero
+  0x00000001               raw
+  0x80000004               zlib
+  0x80000005               bzip2
+  0x80000007               lzfse
+  0x80000008               lzvn
 
 Usage:
-  udif-decode.py <in.dmg> <out.img> [--info]
+  udif-decode.py <in.dmg> <out.img> [--info] [--entry NAME]
 """
-import base64
 import bz2
 import plistlib
 import struct
@@ -27,73 +36,8 @@ import zlib
 from pathlib import Path
 
 MISH = b'mish'
-
-
-def _trailer(data):
-    """The 512-byte koly trailer at the end of the file."""
-    trailer = data[-512:]
-    if trailer[:4] != b'koly':
-        raise SystemExit('not a UDIF image: no koly magic')
-    fields = {
-        'version': struct.unpack_from('>I', trailer, 0x04)[0],
-        'header_size': struct.unpack_from('>I', trailer, 0x08)[0],
-        'flags': struct.unpack_from('>I', trailer, 0x0C)[0],
-        'running_offset': struct.unpack_from('>Q', trailer, 0x10)[0],
-        'data_offset': struct.unpack_from('>Q', trailer, 0x18)[0],
-        'data_length': struct.unpack_from('>Q', trailer, 0x20)[0],
-        'rsrc_offset': struct.unpack_from('>Q', trailer, 0x28)[0],
-        'rsrc_length': struct.unpack_from('>Q', trailer, 0x30)[0],
-        'xml_offset': struct.unpack_from('>Q', trailer, 0xD8)[0],
-        'xml_length': struct.unpack_from('>Q', trailer, 0xE0)[0],
-        'sector_count': struct.unpack_from('>Q', trailer, 0x1EC)[0],
-    }
-    return fields
-
-
-def _blkx(data, trailer):
-    """Pull the blkx blob out of the XML plist the trailer points at."""
-    start = trailer['xml_offset']
-    length = trailer['xml_length']
-    if not length:
-        raise SystemExit('the trailer records no XML plist')
-    blob = data[start:start + length]
-    if blob[:8] == b'bplist02' or blob[:6] == b'bplist':
-        plist = plistlib.loads(blob)
-    else:
-        head = blob[:200].decode('utf-8', errors='replace')
-        if '<plist' not in head:
-            raise SystemExit('the XML area is not a plist: %r' % head[:80])
-        plist = plistlib.loads(blob)
-    entries = plist.get('resource-fork', {}).get('blkx')
-    if not entries:
-        raise SystemExit('the plist has no resource-fork/blkx')
-    first = entries[0]
-    return first.get('Data', first.get('data')), first.get('Name', '')
-
-
-def _runs(blob):
-    """blkx is a mish-wrapped, base64, zlib stream describing the chunks."""
-    if blob[:4] != MISH:
-        raise SystemExit('blkx does not start with mish')
-    # mish, one newline, then base64.
-    first = blob.find(b'\n')
-    payload = b''.join(blob[first + 1:].split())
-    table = zlib.decompress(base64.b64decode(payload))
-
-    magic, version, first_sector, sector_count, data_offset = struct.unpack_from('>4sIQQQ', table, 0)
-    if magic != MISH:
-        raise SystemExit('unexpected decompressed magic %r' % magic)
-    count = struct.unpack_from('>I', table, 200)[0]
-    pos = 204
-    runs = []
-    for _ in range(count):
-        kind, comment, sector, sectors, comp_off, comp_len = struct.unpack_from('>IIQQQ', table, pos)
-        runs.append({'kind': kind, 'comment': comment, 'sector': sector,
-                     'sectors': sectors, 'offset': comp_off, 'length': comp_len})
-        pos += 40
-    return {'first_sector': first_sector, 'sector_count': sector_count,
-            'data_offset': data_offset, 'runs': runs}
-
+ENTRY_HEADER = 64
+RUN_SIZE = 40
 
 TYPE_NAMES = {
     0x00000000: 'zero',
@@ -106,7 +50,61 @@ TYPE_NAMES = {
 }
 
 
-def _inflate(kind, blob):
+def trailer(data):
+    t = data[-512:]
+    if t[:4] != b'koly':
+        raise SystemExit('not a UDIF image: no koly magic')
+    return {
+        'version': struct.unpack_from('>I', t, 0x04)[0],
+        'flags': struct.unpack_from('>I', t, 0x0C)[0],
+        'data_offset': struct.unpack_from('>Q', t, 0x18)[0],
+        'data_length': struct.unpack_from('>Q', t, 0x20)[0],
+        'xml_offset': struct.unpack_from('>Q', t, 0xD8)[0],
+        'xml_length': struct.unpack_from('>Q', t, 0xE0)[0],
+        'sector_count': struct.unpack_from('>Q', t, 0x1EC)[0],
+    }
+
+
+def entries(data, koly):
+    """Every resource-fork/blkx entry, with its binary mish table already parsed."""
+    blob = data[koly['xml_offset']:koly['xml_offset'] + koly['xml_length']]
+    plist = plistlib.loads(blob)
+    out = []
+    for item in plist['resource-fork']['blkx']:
+        raw = item.get('Data', item.get('data'))
+        name = item.get('Name', item.get('name', ''))
+        out.append({'name': name, 'runs': parse_mish(raw)})
+    return out
+
+
+def parse_mish(raw):
+    if raw[:4] != MISH:
+        raise SystemExit('blkx entry does not start with mish: %r' % raw[:8])
+    version = struct.unpack_from('>I', raw, 4)[0]
+    first_sector = struct.unpack_from('>Q', raw, 8)[0]
+    sector_count = struct.unpack_from('>Q', raw, 16)[0]
+    data_offset = struct.unpack_from('>Q', raw, 24)[0]
+    block_descriptors = struct.unpack_from('>I', raw, 36)[0]
+
+    # Some writers put 0 in block_descriptors and rely on the buffer size instead; fall back to
+    # "as many as fit".
+    if not block_descriptors:
+        block_descriptors = (len(raw) - ENTRY_HEADER) // RUN_SIZE
+
+    runs = []
+    pos = ENTRY_HEADER
+    for _ in range(block_descriptors):
+        if pos + RUN_SIZE > len(raw):
+            break
+        kind, comment, sector, sectors, offset, length = struct.unpack_from('>IIQQQQ', raw, pos)
+        runs.append({'kind': kind, 'comment': comment, 'sector': sector,
+                     'sectors': sectors, 'offset': offset, 'length': length})
+        pos += RUN_SIZE
+    return {'version': version, 'first_sector': first_sector, 'sector_count': sector_count,
+            'data_offset': data_offset, 'runs': runs}
+
+
+def inflate(kind, blob):
     if kind == 0x80000005:
         return bz2.decompress(blob)
     if kind == 0x80000004:
@@ -126,51 +124,76 @@ def _inflate(kind, blob):
     raise SystemExit('unsupported chunk type %#x (%s)' % (kind, TYPE_NAMES.get(kind, '?')))
 
 
-def decode(src, dst, info_only=False):
+def decode(src, dst, info_only=False, only=None):
     data = Path(src).read_bytes()
-    trailer = _trailer(data)
-    print('koly: version=%(version)d flags=%(flags)d' % trailer)
-    print('      data fork at %(data_offset)d (%(data_length)d bytes)' % trailer)
-    print('      xml at %(xml_offset)d (%(xml_length)d bytes)' % trailer)
-    gib = trailer['sector_count'] * 512 / 2**30
-    print('      sector_count=%d (%.2f GiB)' % (trailer['sector_count'], gib))
+    koly = trailer(data)
+    print('koly: version=%(version)d flags=%(flags)d' % koly)
+    print('      data fork at %(data_offset)d (%(data_length)d bytes)' % koly)
+    print('      xml at %(xml_offset)d (%(xml_length)d bytes)' % koly)
+    print('      whole image sector_count=%(sector_count)d (%.2f GiB)'
+          % (koly['sector_count'], koly['sector_count'] * 512 / 2**30))
 
-    blob, name = _blkx(data, trailer)
-    print('blkx: %r' % name)
-    plan = _runs(blob)
-    print('blkx: first_sector=%d sector_count=%d runs=%d' % (
-        plan['first_sector'], plan['sector_count'], len(plan['runs'])))
-
-    total = sum(run['sectors'] for run in plan['runs']) * 512
-    print('unpacked size: %d bytes (%.2f GiB)' % (total, total / 2**30))
+    parts = entries(data, koly)
+    print('partitions: %d' % len(parts))
+    for part in parts:
+        plan = part['runs']
+        size = plan['sector_count'] * 512
+        print('  %-28s sector %8d + %8d  = %10d bytes  runs=%d'
+              % (part['name'], plan['first_sector'], plan['sector_count'], size, len(plan['runs'])))
 
     if info_only:
-        seen = {}
-        for run in plan['runs']:
-            label = TYPE_NAMES.get(run['kind'], hex(run['kind']))
-            seen[label] = seen.get(label, 0) + run['sectors'] * 512
-        for label, size in sorted(seen.items(), key=lambda kv: -kv[1]):
-            print('  %-8s %14d bytes' % (label, size))
+        print()
+        for part in parts:
+            seen = {}
+            for run in part['runs']['runs']:
+                label = TYPE_NAMES.get(run['kind'], hex(run['kind']))
+                seen[label] = seen.get(label, 0) + run['sectors'] * 512
+            if seen:
+                print('  %s:' % part['name'])
+                for label, size in sorted(seen.items(), key=lambda kv: -kv[1]):
+                    print('    %-8s %14d bytes' % (label, size))
         return
 
-    base = trailer['data_offset']
+    target = None
+    if only:
+        for part in parts:
+            if part['name'] == only:
+                target = part
+                break
+        if target is None:
+            raise SystemExit('no partition named %r' % only)
+    else:
+        # The whole disk is the largest partition.
+        target = max(parts, key=lambda p: p['runs']['sector_count'])
+
+    plan = target['runs']
+    size = plan['sector_count'] * 512
+    print('writing %r: %d bytes (%.2f GiB), %d runs'
+          % (target['name'], size, size / 2**30, len(plan['runs'])))
+
+    base = koly['data_offset']
+    written = 0
     with open(dst, 'wb') as out:
         for index, run in enumerate(plan['runs']):
-            size = run['sectors'] * 512
+            count = run['sectors'] * 512
             if run['kind'] in (0x00000000, 0x00000002):
-                out.write(b'\0' * size)
+                out.write(b'\0' * count)
             elif run['kind'] == 0x00000001:
                 out.write(data[base + run['offset']:base + run['offset'] + run['length']])
             else:
                 chunk = data[base + run['offset']:base + run['offset'] + run['length']]
-                out.write(_inflate(run['kind'], chunk))
+                out.write(inflate(run['kind'], chunk))
+            written += count
             if index % 100 == 0 or index == len(plan['runs']) - 1:
-                print('  %d/%d runs' % (index + 1, len(plan['runs'])), flush=True)
+                print('  %d/%d runs, %d bytes' % (index + 1, len(plan['runs']), written), flush=True)
 
-    print('wrote %s' % dst)
+    print('wrote %s (%d bytes)' % (dst, written))
 
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         raise SystemExit(__doc__)
-    decode(sys.argv[1], sys.argv[2], info_only='--info' in sys.argv)
+    only = None
+    if '--entry' in sys.argv:
+        only = sys.argv[sys.argv.index('--entry') + 1]
+    decode(sys.argv[1], sys.argv[2], info_only='--info' in sys.argv, only=only)
