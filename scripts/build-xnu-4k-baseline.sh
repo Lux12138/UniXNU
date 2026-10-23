@@ -1086,6 +1086,32 @@ fi
 if [ ! -f "$KERNEL_SDKROOT/usr/local/lib/kernel/libfirehose_kernel.a" ]; then
   bash scripts/build-firehose.sh
 fi
+# Xcode 26.0.1's clang added -Wunnecessary-virtual-specifier. xnu-10063's WARNFLAGS_STD is
+# -Weverything with -Werror in the middle, so the exported C++ headers fail before the kernel
+# links:
+#   OSSymbol.h:383:15: error: virtual method 'isEqualTo' is inside a 'final' class
+# EXTRA_CFLAGS only reaches the kernel objects; the header pass is earlier. Insert the
+# suppressions into the warning set itself, which CWARNFLAGS_STD and CXXWARNFLAGS_STD both extend.
+if [ -f .cache/xnu-work/makedefs/MakeInc.def ]; then
+  if ! grep -q 'Wno-unnecessary-virtual-specifier' .cache/xnu-work/makedefs/MakeInc.def; then
+    python3 - <<'CLANG26'
+import io
+p = '.cache/xnu-work/makedefs/MakeInc.def'
+s = io.open(p, encoding='utf-8').read()
+old = '\t-Wno-unused-macros \\\n'
+new = ('\t-Wno-unused-macros \\\n'
+       '\t-Wno-unnecessary-virtual-specifier \\\n'
+       '\t-Wno-suggest-override \\\n'
+       '\t-Wno-suggest-destructor-override \\\n')
+assert old in s, 'WARNFLAGS_STD anchor not found'
+io.open(p, 'w', encoding='utf-8', newline='').write(s.replace(old, new, 1))
+print('  MakeInc.def: added the clang 26 suppressions to WARNFLAGS_STD')
+CLANG26
+  else
+    echo '  MakeInc.def: clang 26 suppressions already present'
+  fi
+fi
+
 # The baseline builds the kernel; `all` also checks the Apple kext export ABI.
 EXTRA_MAKE_ARGS=()
 ARM_DT_PLATFORM=${XNU_ARM_DT_PLATFORM:-0}
