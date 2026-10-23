@@ -206,7 +206,7 @@ elif APTEST in src:
         APTEST + '\n'
         '\t\t{\n'
         '\t\t\tunsigned char __z = 0;\n'
-        '\t\t\tnabu_mark_text (copyout (&__z, ap, 1) == 0 ? "ap-ok" : "ap-bad", 2500);\n'
+        '\t\t\tnabu_mark_text (copyout (&__z, ap, 1) == 0 ? "ap-ok" : "ap-bad", 1780);\n'
         '\t\t}', 1)
     report.append('  insert ap writability test')
 else:
