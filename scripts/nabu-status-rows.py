@@ -52,7 +52,7 @@ def before(anchor, addition, label):
 
 # 1. IOFindBSDRoot entry
 after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * root, u_int32_t * oflags )\n{',
-      '\tnabu_mark_text("IOFindBSDRoot entered", 2350);\n'
+      '\tnabu_mark_text("IOFindBSDRoot entered", 2420);\n'
       # Clock probe: every timed path here fails identically and all read mach_absolute_time().
       # tA = low 32 bits of the first read (0 = clock reads zero);
       # tD = t2 - t1 (0 = clock does not advance). The spin uses yield only, so it cannot hang.
@@ -60,18 +60,18 @@ after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * r
       '\t\tuint64_t t1 = mach_absolute_time ();\n'
       '\t\tfor (unsigned spin = 0; spin < 200000; ++spin) { __asm__ volatile ("yield" ::: "memory"); }\n'
       '\t\tuint64_t t2 = mach_absolute_time ();\n'
-      '\t\tnabu_mark_num ("tA", (unsigned long)(t1 & 0xffffffffULL), 1780);\n'
-      '\t\tnabu_mark_num ("tD", (unsigned long)(t2 - t1), 1840);\n'
+      '\t\t/* tA is known non-zero (3967735401); only the delta matters. */\n'
+      '\t\tnabu_mark_num ("tD", (unsigned long)(t2 - t1), 1860);\n'
       '\t}\n',
       'row 1520 entry')
 
 # 2. before and after the wait
 before('\t\tservice = IOService::waitForService( matching, &t );',
-       '\t\tnabu_mark_text("A call wfs", 2450);\n',
+       '\t\tnabu_mark_text("A call wfs", 2500);\n',
        'row 1550 A before call')
 
 after('\t\tservice = IOService::waitForService( matching, &t );',
-      '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2450);',
+      '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2500);',
       'row 1550 B after call')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
