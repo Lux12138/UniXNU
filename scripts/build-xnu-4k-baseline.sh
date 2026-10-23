@@ -170,6 +170,12 @@ static volatile unsigned int *g_fb = NULL;
 static unsigned long g_px = 0;
 static unsigned int g_w = 0, g_h = 0;
 static int g_slot = 0;
+/* Latest checkpoint executed, in execution order. max_hit() cannot answer "how far did
+ * the boot get": ulock_initialize records 120..123 inside STARTUP(EARLY_BOOT), so every
+ * later mark (45..65 in bsd_init / IOKitBSDInit / kernel_bootstrap) carries a lower
+ * number and the readout sat on 123 for the whole rest of the run. The probes existed
+ * and fired; the display could not show them. */
+static int g_last = 0;
 static void draw_all(void);   /* defined below; nabu_mark keeps the screen current */
 static unsigned long long g_hits[2] = { 0, 0 }; /* bit (n-1) of word (n-1)/64 */
 #define NABU_MAX_MARK 128

@@ -1,0 +1,12 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -801,6 +801,9 @@
+ 
+ 	bsd_init_kprintf("calling bsd_autoconf\n");
+ 	bsd_autoconf();
++	/* nabu: prove the kernel survived bsd_autoconf(). If this line appears on the
++	 * framebuffer, the IOSurface stop was the end of the log, not a hang. */
++	bsd_init_kprintf("NABU: bsd_autoconf returned\n");
+ 
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
