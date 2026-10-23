@@ -37,7 +37,18 @@ def paths(ctx):
     return out, out / 'userdata-root.img', out / 'userdata-root.json'
 
 
+NXSB = b'NXSB'
+
+
+def is_bare_apfs(dmg):
+    """The SystemOS dmg is a plain APFS image, not a UDIF container."""
+    with open(dmg, 'rb') as handle:
+        return handle.read(4) == NXSB
+
+
 def image_size(dmg):
+    if is_bare_apfs(dmg):
+        return dmg.stat().st_size
     if HOST == 'Darwin':
         info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)],
                              capture_output=True, check=True).stdout
@@ -60,6 +71,8 @@ def image_size(dmg):
 
 def attach(dmg):
     """Attach read-only without mounting; return the whole-disk device."""
+    if is_bare_apfs(dmg):
+        return str(dmg)
     if HOST == 'Darwin':
         out = subprocess.run(['hdiutil', 'attach', '-nomount', '-readonly', '-noverify',
                              '-noautofsck', str(dmg)],
