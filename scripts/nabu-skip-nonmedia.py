@@ -49,9 +49,14 @@ new_guard = '''	// Only services of the class the table asks for are relevant. W
 		} else if (OSSymbol * wm = OSDynamicCast(OSSymbol, wantObj)) {
 			wantName = wm->getCStringNoCopy();
 		}
-		nabu_mark_num("guard",
-		    wantName ? (service->metaCast(wantName) ? 2 : 1) : 0, 1850);
-		if (wantName && !service->metaCast(wantName)) {
+		/* Exact class-name comparison. metaCast walks the inheritance chain and reported that
+		 * the IODTNVRAM node named options IS an IOMedia, so the filter never skipped it. The
+		 * table names a specific provider class, so an exact match is the right test. */
+		const OSMetaClass * gwmc = service->getMetaClass();
+		const char * gname = gwmc ? gwmc->getClassName() : NULL;
+		int gexact = (wantName && gname && strcmp(gname, wantName) == 0) ? 1 : 0;
+		nabu_mark_num("guard", wantName ? (gexact ? 2 : 1) : 0, 1850);
+		if (wantName && !gexact) {
 			return false;
 		}
 	}'''
