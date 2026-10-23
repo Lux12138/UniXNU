@@ -173,6 +173,9 @@ fi
 if [ -f "$ROOT/scripts/nabu-status-rows.py" ]; then
   python3 "$ROOT/scripts/nabu-status-rows.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
 fi
+if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -4
+fi
 
 # Count IOMedia instances right before the root lookup, and bound the untimed IODTNVRAM wait on the
 # boot-failure path so it cannot hang forever.
