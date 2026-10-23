@@ -84,6 +84,44 @@ after('\t\tservice = IOService::waitForService( matching, &t );',
       'row 1550 B after call')
 
 
+
+# 5. enumerate IOMedia: count + first UUID
+COUNT_MEDIA = (
+    '\t\t/* How many IOMedia exist, and what UUID does the first carry? Distinguishes "no media at all"\n'
+    '\t\t * (missing IOBlockStorageDriver) from "media exist with another UUID" (manifest mismatch). */\n'
+    '\t\t{\n'
+    '\t\t\tOSDictionary *__mm = IOService::serviceMatching ("IOMedia");\n'
+    '\t\t\tOSIterator *__mi = __mm ? IOService::getMatchingServices (__mm) : NULL;\n'
+    '\t\t\tunsigned __nmedia = 0;\n'
+    '\t\t\tchar __uuid[16];\n'
+    '\t\t\tfor (int __i = 0; __i < 15; ++__i) { __uuid[__i] = 0; }\n'
+    '\t\t\tif (__mi) {\n'
+    '\t\t\t\tIOService *__us;\n'
+    '\t\t\t\twhile ((__us = OSDynamicCast (IOService, __mi->getNextObject ())) != NULL && __nmedia < 16) {\n'
+    '\t\t\t\t\tif (__nmedia == 0) {\n'
+    '\t\t\t\t\t\tOSString *__uu = OSDynamicCast (OSString, __us->getProperty ("UUID"));\n'
+    '\t\t\t\t\t\tif (__uu) {\n'
+    '\t\t\t\t\t\t\tconst char *__cs = __uu->getCStringNoCopy ();\n'
+    '\t\t\t\t\t\t\tfor (int __i = 0; __i < 12 && __cs[__i]; ++__i) { __uuid[__i] = __cs[__i]; }\n'
+    '\t\t\t\t\t\t} else {\n'
+    '\t\t\t\t\t\t\tconst char *__nk = "no-UUID-prop";\n'
+    '\t\t\t\t\t\t\tfor (int __i = 0; __nk[__i]; ++__i) { __uuid[__i] = __nk[__i]; }\n'
+    '\t\t\t\t\t\t}\n'
+    '\t\t\t\t\t}\n'
+    '\t\t\t\t\t++__nmedia;\n'
+    '\t\t\t\t}\n'
+    '\t\t\t\t__mi->release ();\n'
+    '\t\t\t}\n'
+    '\t\t\tif (__mm) { __mm->release (); }\n'
+    '\t\t\tif (__nmedia == 0) {\n'
+    '\t\t\t\tconst char *__nk = "none";\n'
+    '\t\t\t\tfor (int __i = 0; __nk[__i]; ++__i) { __uuid[__i] = __nk[__i]; }\n'
+    '\t\t\t}\n'
+    '\t\t\tnabu_mark_num ("iomedia", (unsigned long)__nmedia, 1780);\n'
+    '\t\t\tnabu_mark_text (__uuid, 1860);\n'
+    '\t\t}\n'
+)
+
 # 4. replace the sleeping wait with a busy poll
 # waitForService parks the thread and relies on a timer-interrupt wakeup; sleeping does not work here
 # yet (5s timeout never fires), while busy waits do. Ask the catalogue directly instead.
@@ -111,6 +149,11 @@ if SLEEPY in text:
     report.append('  replace row busy poll instead of waitForService')
 else:
     report.append('  MISS   row busy poll instead of waitForService')
+
+
+after('\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2500);',
+      COUNT_MEDIA,
+      'row iomedia enumeration')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
