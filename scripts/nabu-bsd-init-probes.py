@@ -25,7 +25,7 @@ def after(anchor, addition, label):
     if index < 0:
         report.append('  MISS   %s (anchor not found)' % label)
         return
-    end = text.index('\n', index) + 1
+    end = index + len(anchor)
     text = text[:end] + addition + text[end:]
     report.append('  insert %s' % label)
 
