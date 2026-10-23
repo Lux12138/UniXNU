@@ -921,7 +921,7 @@ if 'nabu lock verify off' not in lt:
 # whole region that has stayed dark.
 pkc=sys.argv[9]
 pk=io.open(pkc,encoding='utf-8').read()
-if 'nabu_mark_putc' not in pk:
+if 'nabu_console_silenced' not in pk:
     # pexpert/arm has no osfmk include root, so add_include()'s <arm/...> form does not
     # resolve here (it failed twice). Insert the relative include by hand and never call
     # add_include() for this file.
@@ -933,7 +933,8 @@ if 'nabu_mark_putc' not in pk:
         else:
             pk = _rel + '\n' + pk
     pk = pk.replace('#include <arm/nabu_early_mark.h>\n', '')
-    _pk = ('\tif (nabu_console_fb_ready()) { nabu_mark_putc(c); }\n')
+    _pk = ('\t/* nabu_console_silenced: the framebuffer is reserved for the status rows;\n'
+           '\t * kprintf output is discarded here rather than painted over them. */\n')
     # PE_kputc may be declared as a function pointer or defined with a different shape.
     # Try the common forms before giving up.
     m2 = re.search(r'^PE_kputc\(char c\)\n\{\n', pk, re.M)

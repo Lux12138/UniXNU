@@ -49,7 +49,8 @@ new_guard = '''	// Only services of the class the table asks for are relevant. W
 		} else if (OSSymbol * wm = OSDynamicCast(OSSymbol, wantObj)) {
 			wantName = wm->getCStringNoCopy();
 		}
-		nabu_mark_num("guard", wantName ? 1 : 0, 1850);
+		nabu_mark_num("guard",
+		    wantName ? (service->metaCast(wantName) ? 2 : 1) : 0, 1850);
 		if (wantName && !service->metaCast(wantName)) {
 			return false;
 		}
