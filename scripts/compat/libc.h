@@ -32,6 +32,10 @@ static inline bool OSAtomicCompareAndSwap32Barrier(int32_t o, int32_t n, volatil
 	return __sync_bool_compare_and_swap(v, o, n);
 }
 
+/* BSD's setmode/getmode: parse a chmod-style mode string ("u+x", "go-w") and read it back. */
+void *setmode(const char *mode_string);
+mode_t getmode(const void *set, mode_t base);
+
 #ifdef __cplusplus
 }
 #endif
