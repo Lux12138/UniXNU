@@ -8,7 +8,7 @@
  #include <sys/param.h>
  #include <sys/filedesc.h>
  #include <sys/kernel.h>
-@@ -924,9 +925,14 @@
+@@ -924,6 +925,11 @@
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
 +	NABU_MARK(65);
@@ -20,9 +20,6 @@
 +	NABU_MARK(66);
 +	kprintf("NABU: dtrace done\n");
  #endif
- 
- 	/*
- 	 * We attach the loopback interface *way* down here to ensure
 @@ -1291,8 +1297,12 @@
  bsd_autoconf(void)
  {
