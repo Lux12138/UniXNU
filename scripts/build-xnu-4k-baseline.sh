@@ -345,20 +345,20 @@ void nabu_mark_show(int n)
   if (n != last_sys) { last_sys = n; within = 0; }
   within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 240 : 132), n, 18);
+  /* digits removed: the labelled status rows report the same state */
   /* x=320, not 220: draw_number clears 11*s px from x=32, which reached 252 at s=20
    * and clipped this digit in half. */
-  draw_number(320, (g_h > 900 ? g_h - 240 : 132), within, 18);
+  /* digits removed: the labelled status rows report the same state */
 }
 /* Four values at once. One flash/photo cycle should answer several questions, so
  * every probe site can dump a small tuple instead of a single number. */
 void nabu_mark_quad(int a, int b, int c, int d)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 350 : 132), a, 18);
-  draw_number(220, (g_h > 900 ? g_h - 350 : 132), b, 18);
-  draw_number(32, (g_h > 900 ? g_h - 460 : 300), c, 18);
-  draw_number(220, (g_h > 900 ? g_h - 460 : 300), d, 18);
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
 }
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
@@ -367,7 +367,7 @@ void nabu_mark_val(int v)
   if (g_fb == NULL) { return; }
   /* Separate row from nabu_mark_show: they used to share (32, g_h-320), so this one
    * painted over the subsystem readout and a photo only ever showed the entry id. */
-  draw_number(32, (g_h > 900 ? g_h - 580 : 132), v, 20);
+  /* digits removed: the labelled status rows report the same state */
 }
 
 /* 5x7 glyphs, 5 bytes per character, bit0 = leftmost column of that row. */
