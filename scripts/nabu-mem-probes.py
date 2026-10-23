@@ -1,47 +1,53 @@
 #!/usr/bin/env python3
-"""Dump the physical range through panic, with the numbers pre-formatted into a string.
+"""Extend the working RANGE panic in pmap.c with max_mem and vm_page_free_count.
 
-The panic hook in debug.c paints its format string and then treats each vararg as a char*:
+The RANGE panic built and printed; the vm_resident one could not be made to recompile. So stay in pmap.c
+and add the two values that decide whether freepg's 91 million is even related to this code path.
 
-    nabu_mark_text(str, 1000);
-    if (_a0 != 0) nabu_mark_text(_a0, 1040);
-
-so integers paint nothing -- observed directly: "NABU-RANGE end=%llx first=%llx pages=%u" appeared with
-its placeholders intact. snprintf into a buffer and panic("%s", buf) makes _a0 a real string.
-
-initialize_ram_ranges() is the one place where first_avail, avail_end and avail_page_count all exist,
-and avail_page_count = atop(end - first) is what pmap_free_pages() hands to vm_page_bootstrap -- the
-number that ends up as freepg (91,199,441 / 44 / 43 across three boots, i.e. computed, not random).
+    end - first         = 4.67 GiB   (measured, matches owned_memory_size)
+    avail_page_count    =   122,436  (measured, 10x below (end-first)/4096)
+    max_mem             = ?          (expected 4864 MiB)
+    vm_page_free_count  = ?          (expected <= 122,436; freepg reported 91,199,441)
 """
 import io
 import sys
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else '.cache/xnu-work/osfmk/arm/pmap/pmap.c'
 if not SRC.endswith('pmap.c'):
-    print('  skip   not pmap.c')
     sys.exit(0)
 
 src = io.open(SRC, encoding='utf-8').read()
 report = []
 
+DECL = '\n/* for the range panic */\nextern unsigned int vm_page_free_count;\nextern uint64_t max_mem;\n'
+if 'extern unsigned int vm_page_free_count' not in src:
+    hdr = '#include <vm/vm_page.h>'
+    if hdr in src:
+        src = src.replace(hdr, hdr + DECL, 1)
+    else:
+        src = DECL + src
+    report.append('  insert declarations')
+
 ANCHOR = 'avail_page_count = atop(end - first);'
 INJECT = (
     'avail_page_count = atop(end - first);\n'
     '\t{\n'
-    '\t\tchar __b[128];\n'
-    '\t\tsnprintf(__b, sizeof(__b), "NABU-RANGE end=%llx first=%llx pages=%u",\n'
-    '\t\t    (unsigned long long)end, (unsigned long long)first, avail_page_count);\n'
+    '\t\tchar __b[192];\n'
+    '\t\tsnprintf(__b, sizeof(__b),'
+    ' "NABU-RANGE end=%llx first=%llx pages=%u freepg=%u maxmem=%llu",\n'
+    '\t\t    (unsigned long long)end, (unsigned long long)first, avail_page_count,\n'
+    '\t\t    vm_page_free_count, (unsigned long long)(max_mem >> 20));\n'
     '\t\tpanic ("%s", __b);\n'
     '\t}'
 )
 
-if 'NABU-RANGE' in src:
-    report.append('  skip   range panic already present')
+if 'freepg=%u' in src:
+    report.append('  skip   already extended')
 elif ANCHOR in src:
     src = src.replace(ANCHOR, INJECT, 1)
-    report.append('  insert formatted range panic')
+    report.append('  insert extended range panic')
 else:
-    report.append('  MISS   avail_page_count anchor')
+    report.append('  MISS   anchor')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
