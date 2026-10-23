@@ -177,7 +177,7 @@ if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -4
 fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/arm_init.c | tail -4
+  : # arm_init.c probe retired (row collisions)
 fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/pmap/pmap.c | tail -4
