@@ -173,6 +173,10 @@ if [ -f "$ROOT/scripts/nabu-wfs-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-wfs-probes.py" .cache/xnu-work/iokit/Kernel/IOService.cpp | tail -3
 fi
 
+if [ -f "$ROOT/scripts/nabu-timeout-var-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-timeout-var-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -3
+fi
+
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
