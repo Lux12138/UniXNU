@@ -13,7 +13,14 @@ parser.add_argument('--negative-aes-kat', action='store_true', help='Isolated ow
 parser.add_argument('--verified-root', action='store_true', help='Authenticate all actual disk reads against an independently signed immutable policy')
 parser.add_argument('--verified-root-bundle', action='store_true', help='Select exactly one capacity-matching policy per device, then independently authenticate it')
 parser.add_argument('--negative-verified-block', action='store_true', help='Negative own-buffer control: corrupt only the completed DMA snapshot')
+# Bring-up mode from UniXNU-uke: compile the NativeUfs transport without the
+# verified-root policy bundle, so the running controller can be adopted before any
+# signed policy exists. Without it the fork expects kits/VerifiedRoot, which this
+# tree does not carry.
+parser.add_argument('--unverified', action='store_true', help='NativeUfs: compile the bring-up transport without the verified-root policy bundle')
 args = parser.parse_args()
+if args.unverified and args.component != 'NativeUfs':
+    parser.error('--unverified currently applies to the NativeUfs bring-up transport only')
 if args.verified_root_bundle and not args.verified_root:
     parser.error('A policy bundle requires verified block mode')
 if args.verified_root_bundle and args.negative_verified_block:
@@ -73,7 +80,7 @@ command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                 '-I', str(ROOT / '.cache/xnu-work/osfmk')])
 if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
     command += ['-I', str(ROOT / 'build/storage-abi/include')]
-    if args.verified_root:
+    if args.verified_root and not getattr(args, 'unverified', False):
         command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-DNATIVE_VERIFIED_BLOCK=1']
     if args.negative_verified_block:
         command += ['-DNATIVE_VERIFIED_BLOCK_INJECT_FAULT=1']
@@ -84,8 +91,16 @@ if component == 'NativeUfs':
     # verified-block personality is structural. nabu supplies the VerifiedRoot symbols
     # through a stub archive with policy_count=0 (device is never published until a
     # real signed policy exists); sheng supplies them through build-verified-root-probe.
-    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-I', str(ROOT / 'drivers/NativeVirtioBlock'),
-                '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1', '-mgeneral-regs-only']
+    #
+    # --unverified is the bring-up alternative UniXNU-uke uses: compile the transport with the
+    # policy bundle switched off so the running controller can be adopted before any signed
+    # policy exists. Without it the build requires kits/VerifiedRoot, which this tree lacks.
+    command += ['-I', str(ROOT / 'drivers/NativeVirtioBlock'), '-mgeneral-regs-only']
+    if args.unverified:
+        command += ['-DNATIVE_VERIFIED_BLOCK=0']
+    else:
+        command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'),
+                    '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
 if component=='NativeOfflineGPU':
     command += ['-I',str(ROOT/'drivers/NativeVirtioConsole')]
 if component in ('NativeLegacyDisplay','NativeHidInput'):
