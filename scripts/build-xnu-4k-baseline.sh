@@ -562,11 +562,15 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
   g_fb = (volatile unsigned int *)(unsigned long)(va + (pbase & 0xFFFUL));
   g_px = row / 4;
   g_w = (unsigned int)w; g_h = (unsigned int)h;
+  /* Wipe what UEFI and darwinboot left behind -- the Apple logo and the blue banner -- so the panel
+   * shows only what the probes paint. */
+  fill(0, 0, g_w, g_h, 0xFF000000);
   draw_all();
-  /* Take over kprintf now that the framebuffer is writable. PE_init_kprintf() ran during
-   * STARTUP(KPRINTF) and pointed PE_kputc at the serial/console path, which does not exist
-   * on this board, so the kernel printed nothing at all. */
-  {
+  /* The console is deliberately NOT redirected into the framebuffer. Doing so was what made a
+   * silent kernel talk, but it also painted every kprintf over the panel on top of the boot log UEFI
+   * already left there. PE_kputc keeps pointing at the serial sink STARTUP(KPRINTF) installed; that
+   * path does not exist on this board, so output is discarded rather than drawn. */
+  if (0) {
     extern void (*PE_kputc)(char);
     PE_kputc = nabu_mark_putc;
   }
@@ -1694,18 +1698,16 @@ fi
     test -f "$UFS_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$UFS_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $UFS_ARCHIVE"
-    # nabu: NativeUfsBlock derives from IOBlockStorageDevice, which lives in the
-    # IOStorageFamily kext rather than the kernel. audit-storage-interface.py compiles
-    # the real IOBlockStorageDevice.cpp with the kernel's own compile arguments into
-    # build/storage-abi/IOBlockStorageDevice-reference.o; linking that object supplies
-    # the base class, its vtable and gMetaClass so make-stage linking succeeds.
-    STORAGE_REF=$ROOT/build/storage-abi/IOBlockStorageDevice-reference.o
-    if [ -f "$STORAGE_REF" ]; then
-      KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $STORAGE_REF"
-      echo "nabu: linking $STORAGE_REF for IOBlockStorageDevice"
-    else
-      echo "nabu: WARNING storage reference object missing; NativeUfs will not link" >&2
-    fi
+    # Do NOT link build/storage-abi/IOBlockStorageDevice-reference.o. That object defines the very
+    # class the prelinked IOStorageFamily kext already provides, so linking it registers a second
+    # metaclass and OSMetaClass::postModLoad panics:
+    #
+    #   OSMetaClass: Kext com.apple.iokit.IOStorageFamily class IOBlockStorageDevice is a duplicate;
+    #     kext __kernel__ already has a class by that name
+    #
+    # In register-probe mode NativeUfsBlock is not compiled at all, so nothing needs those symbols.
+    # When the block driver is eventually enabled, its symbols must come from the verified-root
+    # bundle -- see configs/nabu_defconfig's header for that gate chain.
   fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
