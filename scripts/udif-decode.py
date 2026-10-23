@@ -75,10 +75,9 @@ def _runs(blob):
     """blkx is a mish-wrapped, base64, zlib stream describing the chunks."""
     if blob[:4] != MISH:
         raise SystemExit('blkx does not start with mish')
-    # Two newline-terminated header lines, then base64.
+    # mish, one newline, then base64.
     first = blob.find(b'\n')
-    second = blob.find(b'\n', first + 1)
-    payload = b''.join(blob[second + 1:].split())
+    payload = b''.join(blob[first + 1:].split())
     table = zlib.decompress(base64.b64decode(payload))
 
     magic, version, first_sector, sector_count, data_offset = struct.unpack_from('>4sIQQQ', table, 0)
