@@ -424,14 +424,14 @@ void nabu_mark_putc(char c)
   if (c == '\n' || c == '\r') {
     g_tx = 16;
     g_ty += ch;
-    if (g_ty > (g_h > 200 ? g_h - 40 : 600)) { g_ty = 16; }
+    if (g_ty > (g_h > 200 ? g_h - 780 : 600)) { g_ty = 16; }
     return;
   }
   if (c < 32 || c > 126) { c = ' '; }
   if (g_tx + cw > (g_w > 40 ? g_w - 16 : 600)) {
     g_tx = 16;
     g_ty += ch;
-    if (g_ty > (g_h > 200 ? g_h - 40 : 600)) { g_ty = 16; }
+    if (g_ty > (g_h > 200 ? g_h - 780 : 600)) { g_ty = 16; }
   }
   {
     const unsigned char *glyph = g_ascii7[(unsigned char)c - 32];
@@ -484,7 +484,7 @@ void nabu_mark_text(const char *s, unsigned int y)
   if (((unsigned long)s >> 48) != 0xFFFFUL) { return; }
 
   /* Wipe the band first: leftover UEFI text underneath made glyphs unreadable. */
-  fill(0, y > 20 ? y - 12 : 0, g_w, 10 * lh, 0xFF000000);
+  fill(0, y > 20 ? y - 12 : 0, g_w, lh + 16, 0xFF000000);
 
   per_line = (g_w > left + cw ? (g_w - left - 8) / cw : 30);
   if (per_line == 0) { per_line = 1; }

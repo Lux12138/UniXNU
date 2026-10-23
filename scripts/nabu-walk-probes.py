@@ -51,9 +51,9 @@ after('\tdone = 0;\n\tdo{',
       '\t\tstatic unsigned long walkN = 0;\n'
       '\t\tconst OSMetaClass * walkMC = service->getMetaClass();\n'
       '\t\t++walkN;\n'
-      '\t\tnabu_mark_num("walk", walkN, 1450);\n'
-      '\t\tnabu_mark_text(walkMC ? walkMC->getClassName() : "?", 1520);\n'
-      '\t\tnabu_mark_text(service->getName(), 1590);\n'
+      '\t\tnabu_mark_num("walk", walkN, 1920);\n'
+      '\t\tnabu_mark_text(walkMC ? walkMC->getClassName() : "?", 1990);\n'
+      '\t\tnabu_mark_text(service->getName(), 2060);\n'
       '\t}\n',
       'walk counter + class name + service name')
 
