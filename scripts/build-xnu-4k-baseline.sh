@@ -524,7 +524,7 @@ static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, g_h > 900 ? g_h - 700 : 0, g_w, 700, 0xFF000000);
+  /* No band clear: it erased the status rows on every NABU_MARK. */
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
@@ -544,14 +544,14 @@ static void draw_all(void)
     }
     for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
       if ((g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) == 0) { continue; }
-      fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 690 : 32), 48, 48, g_palette[(n - 1) & 7]);
+      (void)n;  /* squares removed: they overlapped the status rows */
       g_slot++;
     }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
   /* Own row: this shared (32, g_h-320) with nabu_mark_show subsystem, so the two
    * painted over each other and a photo could not tell which number it was. */
-  draw_number(32, (g_h > 900 ? g_h - 120 : 132), max_hit(), 20);
+  (void)max_hit;  /* checkpoint digits removed: the labelled rows report the same state */
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
