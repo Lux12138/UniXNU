@@ -10,7 +10,7 @@
  #include <sys/kernel.h>
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -801,6 +802,12 @@
+@@ -801,6 +802,11 @@
  
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
