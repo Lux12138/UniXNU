@@ -21,6 +21,9 @@ import plistlib
 import re
 import struct
 import subprocess
+import sys
+
+HOST = sys.platform
 
 from .ipsw import Ipsw
 from .util import Error, log, run, sha256_file, tool
@@ -35,27 +38,58 @@ def paths(ctx):
 
 
 def image_size(dmg):
-    info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)], capture_output=True, check=True).stdout
-    return plistlib.loads(info)['Size Information']['Total Bytes']
-
+    if HOST == 'Darwin':
+        info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)],
+                             capture_output=True, check=True).stdout
+        return plistlib.loads(info)['Size Information']['Total Bytes']
+    # 7-Zip reads DMG natively, LZFSE included, and reports the unpacked member size.
+    listing = subprocess.run(['7z', 'l', '-slt', str(dmg)], capture_output=True,
+                             text=True, check=True).stdout
+    for block in listing.split('- - -'):
+        heading = dict(line.split(' = ', 1) for line in block.splitlines()
+                       if ' = ' in line and not line.startswith(' '))
+        if heading.get('Type') == 'APFS' and heading.get('Size', '').isdigit():
+            return int(heading['Size'])
+    raise Error(f'7z reported no APFS member in {dmg}')
 
 def attach(dmg):
     """Attach read-only without mounting; return the whole-disk device."""
-    out = subprocess.run(['hdiutil', 'attach', '-nomount', '-readonly', '-noverify', '-noautofsck', str(dmg)],
-                         capture_output=True, text=True, check=True).stdout
-    for line in out.splitlines():
-        match = re.match(r'(/dev/disk\d+)\s', line)
-        if match:
-            return match.group(1)
-    raise Error('could not find the attached disk device')
+    if HOST == 'Darwin':
+        out = subprocess.run(['hdiutil', 'attach', '-nomount', '-readonly', '-noverify',
+                             '-noautofsck', str(dmg)],
+                             capture_output=True, text=True, check=True).stdout
+        for line in out.splitlines():
+            match = re.match(r'(/dev/disk\d+)\s', line)
+            if match:
+                return match.group(1)
+        raise Error('could not find the attached disk device')
+    # No hdiutil here: unpack the APFS member to a file beside the dmg and return its path.
+    # The caller only reads it sequentially.
+    out = dmg.parent / (dmg.stem + '.apfs')
+    if not out.is_file():
+        subprocess.run(['7z', 'x', '-y', f'-o{dmg.parent}', str(dmg)], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        candidates = sorted(dmg.parent.glob('*.apfs'))
+        if not candidates:
+            raise Error(f'7z produced no apfs member from {dmg}')
+        if candidates[0] != out:
+            candidates[0].rename(out)
+    return str(out)
 
+
+def detach(device):
+    if HOST == 'Darwin':
+        subprocess.run(['hdiutil', 'detach', device], capture_output=True)
 
 def build(ctx, dry_run=False):
     log('userdata payload')
     spec = ctx.board.get('userdata')
     if not spec:
         raise Error('board.toml has no [userdata]')
-    tool('hdiutil', 'the disk images are attached with macOS hdiutil')
+    if HOST == 'Darwin':
+        tool('hdiutil', 'the disk images are attached with macOS hdiutil')
+    else:
+        tool('7z', 'the disk images are unpacked with 7-Zip, which reads DMG with LZFSE')
     source = Ipsw(ctx)
     capacity = (spec['last_lba'] - spec['first_lba'] + 1) * spec.get('lba_bytes', 4096)
     if dry_run:
@@ -84,7 +118,7 @@ def build(ctx, dry_run=False):
         for (name, offset, size), (_, dmg) in zip(layout, sources):
             device = attach(dmg)
             try:
-                raw = device.replace('/dev/disk', '/dev/rdisk')
+                raw = (device.replace('/dev/disk', '/dev/rdisk') if HOST == 'Darwin' else device)
                 digest = hashlib.sha256()
                 target.seek(offset)
                 done = 0
@@ -98,7 +132,7 @@ def build(ctx, dry_run=False):
                         target.write(data)
                         done += want
             finally:
-                subprocess.run(['hdiutil', 'detach', device], capture_output=True)
+                detach(device)
             entries.append((name, offset, size, digest.digest()))
             log(f'userdata: {name} {size} bytes at {offset:#x} sha256 {digest.hexdigest()}')
         header = bytearray(4096)
