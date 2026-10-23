@@ -141,6 +141,13 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
     git -C .cache/xnu-work apply "$PATCH"
   fi
 done
+# Strip any NABU probe lines left over from earlier inserter versions before adding new ones.
+# unixnu tree's reset does not clear these files, so a stale probe keeps compiling and keeps
+# flooding the console even after its inserter is disabled.
+if [ -f "$ROOT/scripts/nabu-clean-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-clean-probes.py"
+fi
+
 # --- nabu: bsd_init probes (diagnostic only) ---
 # Inserted by text rather than by diff: a unified diff has to match line numbers against a tree
 # that already carries 64 other patches, and git apply drops a hunk that misses by more than a few
