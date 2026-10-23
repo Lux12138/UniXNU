@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compile the generic platform expert against the actual source-kernel ABI."""
 import argparse
+import os
 import json
 from pathlib import Path
 import struct
@@ -33,6 +34,14 @@ component = args.component
 recipe = ROOT / 'build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/iokit/DEVELOPMENT/IOPlatformExpert.cpo.json'
 record = json.loads(recipe.read_text().strip().rstrip(','))
 source = ROOT / 'drivers' / ('NativeMobileDisplay' if component in ('NativeLegacyDisplay','NativeGOPPresenter') else 'NativeMetal' if component in ('NativeOfflineGPU','NativeOfflineAccelerator','NativeIOGPUProviderProbe') else component) / {'NativeAdreno':'NativeAdrenoService.cpp'}.get(component, component + '.cpp')
+
+if component == 'NativeUfs' and os.environ.get('XNU_NABU_UFS_REGISTER_PROBE') == '1':
+    # Read-only register probe in place of the block driver. No MMIO store, no DMA, no
+    # SCSI command, no block device -- it only reports what the GCC and UFSHCI windows
+    # read as, which is the question a bring-up has to answer first.
+    source = ROOT / 'scripts/nabu-ufs-register-probe.cpp'
+    if not source.is_file():
+        raise SystemExit('Missing nabu UFS register probe source')
 out = ROOT / 'build' / {'ArmVirtPlatform': 'armvirt-platform', 'ArmDTPlatform': 'armdt-platform', 'ArmCpu': 'armcpu', 'NativeAES': 'native-aes',
                         'NativeVirtioBlock': 'native-virtio-block', 'NativeRamBlock': 'native-ram-block',
                         'NativeMobileDisplay': 'native-mobile-display', 'NativeVirtioConsole': 'native-virtio-console',
