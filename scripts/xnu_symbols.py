@@ -29,7 +29,16 @@ def kernel_names(root, global_only=True):
         # Return an empty set: the archive builders then skip collision checks instead of aborting.
         print('warning: link.filelist missing, using empty kernel symbol set', flush=True)
         return set()
-    names = defined_names([line.strip() for line in filelist.read_text().splitlines() if line.strip()], global_only)
+    # Objects listed here may already be gone: a per-object flag change deletes the stale object,
+    # and the list is only rewritten on the next full link. Keep the ones that still exist.
+    entries = [line.strip() for line in filelist.read_text().splitlines() if line.strip()]
+    present = [entry for entry in entries if Path(entry).is_file()]
+    if len(present) != len(entries):
+        print('warning: %d of %d objects in link.filelist are gone; using the rest'
+              % (len(entries) - len(present), len(entries)), flush=True)
+    if not present:
+        return set()
+    names = defined_names(present, global_only)
     # The link also exports aliases (all-alias.exp: "_real _alias") that no object defines under that name.
     aliases = root / OBJ / 'all-alias.exp'
     if aliases.is_file():
