@@ -152,21 +152,9 @@ fi
 # Inserted by text rather than by diff: a unified diff has to match line numbers against a tree
 # that already carries 64 other patches, and git apply drops a hunk that misses by more than a few
 # lines without failing the build. The inserter keys on unique anchors and is safe to repeat.
-if [ -f "$ROOT/scripts/nabu-bsd-init-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-bsd-init-probes.py" .cache/xnu-work/bsd/kern/bsd_init.c | tail -4
-fi
 
-if [ -f "$ROOT/scripts/nabu-iofindbsdroot-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-iofindbsdroot-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -3
-fi
 
-if [ -f "$ROOT/scripts/nabu-setconf-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-setconf-probes.py" .cache/xnu-work/bsd/kern/bsd_init.c | tail -3
-fi
 
-if [ -f "$ROOT/scripts/nabu-rootmatch-tail-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-rootmatch-tail-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
-fi
 
 if [ -f "$ROOT/scripts/nabu-shorten-root-timeout.py" ]; then
   python3 "$ROOT/scripts/nabu-shorten-root-timeout.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp
