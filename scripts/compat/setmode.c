@@ -13,49 +13,40 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* The parsed set: the bits to clear and the bits to set. */
+/* The parsed set: the bits to clear and the bits to set, already shifted into place. */
 struct mode_set {
 	mode_t clear;
 	mode_t set;
 };
 
-static mode_t
-who_bits(char who, int is_dir)
+/* Shift for a who-class: owner lives at bit 6, group at 3, other at 0. */
+static int
+who_shift(char who)
 {
-	mode_t bits = 0;
-
-	if (who == 'u' || who == 'a') {
-		bits |= S_IRWXU;
+	switch (who) {
+	case 'u': return 6;
+	case 'g': return 3;
+	case 'o': return 0;
+	default:  return -1;   /* 'a' or unset: all three */
 	}
-	if (who == 'g' || who == 'a') {
-		bits |= S_IRWXG;
-	}
-	if (who == 'o' || who == 'a') {
-		bits |= S_IRWXO;
-	}
-	if (is_dir) {
-		if (who == 'u' || who == 'a') {
-			bits |= S_ISUID;
-		}
-		if (who == 'g' || who == 'a') {
-			bits |= S_ISGID;
-		}
-	}
-	return bits;
 }
 
+/* r/w/x as a 3-bit value, applied at the who shift above. */
 static mode_t
-perm_bits(char perm)
+perm_bits(char perm, int shift)
 {
+	mode_t value = 0;
+
 	switch (perm) {
-	case 'r': return 4;
-	case 'w': return 2;
-	case 'x': return 1;
-	case 'X': return 1;   /* only meaningful on directories; approximated */
-	case 's': return 0;   /* setuid/setgid handled through who_bits */
-	case 't': return 0;   /* sticky handled below */
+	case 'r': value = 4; break;
+	case 'w': value = 2; break;
+	case 'x': value = 1; break;
+	case 'X': value = 1; break;   /* approximated: treated as x */
+	case 's': return (shift == 6) ? S_ISUID : (shift == 3) ? S_ISGID : 0;
+	case 't': return S_ISVTX;
 	default:  return 0;
 	}
+	return (mode_t)(value << shift);
 }
 
 void *
@@ -103,34 +94,39 @@ setmode(const char *mode_string)
 
 		while (*cursor == '+' || *cursor == '-' || *cursor == '=') {
 			char op = *cursor++;
+			int shift = (who != 0) ? who_shift(who) : -1;
 			mode_t perms = 0;
 			int any = 0;
+
 			while (*cursor != '\0' && *cursor != ',' &&
 			       *cursor != '+' && *cursor != '-' && *cursor != '=') {
-				perms |= perm_bits(*cursor);
-				if (*cursor == 's') {
-					perms |= (who == 'u') ? S_ISUID : S_ISGID;
-				}
-				if (*cursor == 't') {
-					perms |= S_ISVTX;
+				if (shift >= 0) {
+					perms |= perm_bits(*cursor, shift);
+				} else {
+					/* 'a' or no who: apply at all three shifts */
+					perms |= perm_bits(*cursor, 6);
+					perms |= perm_bits(*cursor, 3);
+					perms |= perm_bits(*cursor, 0);
 				}
 				any = 1;
 				cursor++;
 			}
 			if (!any) {
-				perms = 0777;
+				perms = (shift >= 0) ? ((mode_t)07 << shift) : 0777;
 			}
-			mode_t mask = (who != 0) ? who_bits(who, 1) : 07777;
+
+			mode_t mask = (shift >= 0) ? ((mode_t)07777 & ~((mode_t)077 << shift))
+			                           : 07777;
 			switch (op) {
 			case '+':
-				result->set |= perms & mask;
+				result->set = (mode_t)((result->set & ~mask) | (perms & mask));
 				break;
 			case '-':
-				result->clear |= perms & mask;
+				result->clear |= (mode_t)(perms & mask);
 				break;
 			case '=':
 				result->clear |= mask;
-				result->set |= perms & mask;
+				result->set = (mode_t)((result->set & ~mask) | (perms & mask));
 				break;
 			}
 		}
