@@ -1778,12 +1778,14 @@ PY_BINDINGS
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$VERIFIED_ROOT_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $VERIFIED_ROOT_ARCHIVE"
   fi
-  if [ "$MOCKFS_MODE" = 1 ]; then
-    MOCKFS_ARCHIVE=$ROOT/build/mockfs-fixture/libmockfs_fixture.a
-    test -f "$MOCKFS_ARCHIVE"
-    KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$MOCKFS_ARCHIVE"
-    KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $MOCKFS_ARCHIVE"
-  fi
+  # -DMOCKFS=1 on vfs_conf.o already compiles mockfs into the kernel, so force-loading the fixture
+  # archive as well puts the same 23 symbols in the link twice:
+  #
+  #   ld: 23 duplicate symbols for architecture arm64
+  #   .../bsd/DEVELOPMENT/mockfs_vnops.o
+  #   .../build/mockfs-fixture/libmockfs_fixture.a(mockfs_vnops.o)
+  #
+  # The built-in path is the one that matters; the archive was the earlier approach.
   if [ "$SHENG_PMGR" = 1 ]; then
     PMGR_ARCHIVE=$ROOT/build/sheng-platform-power/libShengPlatformPower.a
     test -f "$PMGR_ARCHIVE"
