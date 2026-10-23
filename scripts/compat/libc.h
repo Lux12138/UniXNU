@@ -37,6 +37,30 @@ static inline bool OSAtomicCompareAndSwap32Barrier(int32_t o, int32_t n, volatil
 void *setmode(const char *mode_string);
 mode_t getmode(const void *set, mode_t base);
 
+/* Mach page rounding. Darwin gets these from <mach/vm_param.h>; on a host build tool they are
+ * arithmetic, so expand them here rather than dragging in the Mach headers. */
+#ifndef PAGE_SIZE
+#define PAGE_SIZE 4096
+#endif
+#ifndef PAGE_MASK
+#define PAGE_MASK (~(uintptr_t)(PAGE_SIZE - 1))
+#endif
+#ifndef round_page
+#define round_page(x) (((x) + PAGE_SIZE - 1) & PAGE_MASK)
+#endif
+#ifndef trunc_page
+#define trunc_page(x) ((x) & PAGE_MASK)
+#endif
+#ifndef mach_vm_round_page
+#define mach_vm_round_page(x) ((uint64_t)round_page(x))
+#endif
+#ifndef mach_vm_trunc_page
+#define mach_vm_trunc_page(x) ((uint64_t)trunc_page(x))
+#endif
+#ifndef vm_round_page
+#define vm_round_page(x) round_page(x)
+#endif
+
 #ifdef __cplusplus
 }
 #endif
