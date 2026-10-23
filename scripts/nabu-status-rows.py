@@ -52,17 +52,17 @@ def before(anchor, addition, label):
 
 # 1. IOFindBSDRoot entry
 after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * root, u_int32_t * oflags )\n{',
-      '\tnabu_mark_text("IOFindBSDRoot entered", 2350);\n',
-    # Clock probe: every timed path in this environment fails identically at this stage and all
-    # read mach_absolute_time(). tA = low 32 bits of the first read (0 = clock reads zero);
-    # tD = t2 - t1 (0 = clock does not advance). Spin uses yield only, so it cannot hang.
-    '\t{\n'
-    '\t\tuint64_t t1 = mach_absolute_time ();\n'
-    '\t\tfor (unsigned spin = 0; spin < 200000; ++spin) { __asm__ volatile ("yield" ::: "memory"); }\n'
-    '\t\tuint64_t t2 = mach_absolute_time ();\n'
-    '\t\tnabu_mark_num ("tA", (unsigned long)(t1 & 0xffffffffULL), 1780);\n'
-    '\t\tnabu_mark_num ("tD", (unsigned long)(t2 - t1), 1840);\n'
-    '\t}\n'
+      '\tnabu_mark_text("IOFindBSDRoot entered", 2350);\n'
+      # Clock probe: every timed path here fails identically and all read mach_absolute_time().
+      # tA = low 32 bits of the first read (0 = clock reads zero);
+      # tD = t2 - t1 (0 = clock does not advance). The spin uses yield only, so it cannot hang.
+      '\t{\n'
+      '\t\tuint64_t t1 = mach_absolute_time ();\n'
+      '\t\tfor (unsigned spin = 0; spin < 200000; ++spin) { __asm__ volatile ("yield" ::: "memory"); }\n'
+      '\t\tuint64_t t2 = mach_absolute_time ();\n'
+      '\t\tnabu_mark_num ("tA", (unsigned long)(t1 & 0xffffffffULL), 1780);\n'
+      '\t\tnabu_mark_num ("tD", (unsigned long)(t2 - t1), 1840);\n'
+      '\t}\n',
       'row 1520 entry')
 
 # 2. before and after the wait
