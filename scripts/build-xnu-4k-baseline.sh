@@ -570,11 +570,20 @@ void nabu_mark_map(unsigned long pbase, unsigned long row, unsigned long w, unsi
   g_fb = (volatile unsigned int *)(unsigned long)(va + (pbase & 0xFFFUL));
   g_px = row / 4;
   g_w = (unsigned int)w; g_h = (unsigned int)h;
+  /* Wipe what UEFI and darwinboot left behind -- the Apple logo and the blue banner -- so the panel
+   * shows only the marker squares and the status rows. */
+  fill(0, 0, g_w, g_h, 0xFF000000);
   draw_all();
-  /* Take over kprintf now that the framebuffer is writable. PE_init_kprintf() ran during
-   * STARTUP(KPRINTF) and pointed PE_kputc at the serial/console path, which does not exist
-   * on this board, so the kernel printed nothing at all. */
-  {
+  /* The console is deliberately NOT redirected into the framebuffer.
+   *
+   * It was, to make the silent kernel talk, and that worked -- but it also means every kprintf is
+   * painted over the panel, on top of the boot log UEFI already put there. The frame buffer is now
+   * reserved for the marker squares and the status rows, which are the only things worth reading.
+   *
+   * PE_kputc keeps pointing at the serial/console sink set up by STARTUP(KPRINTF). That path does
+   * not exist on this board, so kprintf output is discarded rather than drawn. The UART tee in
+   * nabu_mark_putc is unaffected; it is a separate sink. */
+  if (0) {
     extern void (*PE_kputc)(char);
     PE_kputc = nabu_mark_putc;
   }
