@@ -26,6 +26,8 @@ ZLIB = 0x80000005
 BZIP2 = 0x80000006
 LZFSE = 0x80000007
 XZ = 0x80000008
+COMMENT = 0x7FFFFFFE
+END = 0xFFFFFFFF
 
 
 def is_udif(handle):
@@ -108,6 +110,9 @@ def unpack(handle, sink, runs, base):
     total = 0
     for run in runs:
         size = run['sectors'] * 512
+        if run['kind'] in (END, COMMENT):
+            # Terminators and comments carry no output.
+            continue
         if run['kind'] in (ZERO, IGNORE):
             sink.write(b'\0' * size)
         elif run['kind'] == RAW:
