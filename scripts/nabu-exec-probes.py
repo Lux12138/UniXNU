@@ -190,8 +190,8 @@ elif MM in src:
         src = src.replace(hdr, hdr + decl, 1) if hdr in src else decl + src
     src = src.replace(MM,
         MM + '\n'
-        '\t\tnabu_mark_num ("maxmem", (unsigned long)(max_mem >> 20), 2340);\n'
-        '\t\tnabu_mark_num ("pages", (unsigned long)vm_page_pages, 2500);', 1)
+        '\t\tnabu_mark_num ("maxmem", (unsigned long)(max_mem >> 20), 1180);\n'
+        '\t\tnabu_mark_num ("pages", (unsigned long)vm_page_pages, 1260);', 1)
     report.append('  insert maxmem + pages rows')
 else:
     report.append('  MISS   freepg anchor')
