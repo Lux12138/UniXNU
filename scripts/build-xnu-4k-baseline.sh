@@ -2,6 +2,29 @@
 set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$ROOT"
+
+# kernel.py builds a cold tree twice. The first run exists only to produce the compile records the
+# archive builders and prelink need, and it strips features from the environment:
+#
+#   subprocess_env = {**env, 'XNU_BOOT_PROGRESS': '0', 'XNU_SOURCE_CORECRYPTO14': '0',
+#                     'XNU_ARMCPU': '0', 'XNU_SOURCE_PTHREAD': '0', 'XNU_NATIVE_ARCH_TIMER': '0'}
+#
+# Every qualified feature in this script then refuses to build, one gate at a time ("NativeAES
+# requires the qualified original AES/crypto prelink closure", "the owner crypto probe requires
+# the qualified original prelinked crypto provider", and so on). Rather than exempt each gate
+# individually, treat a record-less start as the bootstrap pass it is and switch the qualified
+# features off wholesale. The real build follows with the full environment and every gate then
+# sees what it expects.
+if [ ! -f build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json ]; then
+  echo '  [bootstrap] no compile records yet: running the record pass with qualified features off' >&2
+  export XNU_NATIVE_UFS=0 XNU_NATIVE_AES=0 XNU_NATIVE_VIRTIO_BLOCK=0 XNU_NATIVE_RAM_BLOCK=0
+  export XNU_NATIVE_VIRTIO_CONSOLE=0 XNU_SOURCE_MOCKFS=0 XNU_TRUST_CACHE_RUNTIME=0
+  export XNU_NATIVE_CS_HASH_CACHE=0 XNU_VERIFIED_ROOT_PROBE=0 XNU_OWNER_ROOT_AUDIT=0
+  export XNU_OWNER_ROOT_TRUST=0 XNU_OWNER_CACHE_MOUNT=0 XNU_OWNER_CACHE_STARTUP=0
+  export XNU_OWNER_BOOT_MANIFEST=0 XNU_OWNER_DATA_MOUNT=0 XNU_OWNER_UNION_SYSTEMOS=0
+  export XNU_BOOT_PROGRESS=0 XNU_SOURCE_CORECRYPTO14=0 XNU_ARMCPU=0 XNU_SOURCE_PTHREAD=0
+  export XNU_NATIVE_ARCH_TIMER=0
+fi
 # Source versions come from feeds.toml through the unixnu driver; the defaults are the qualified ones.
 XNU_TAG=${UNIXNU_XNU_TAG:-xnu-10063.141.1}
 XNU_COMMIT=${UNIXNU_XNU_COMMIT:-d8b80295118ef25ac3a784134bcf95cd8e88109f}
