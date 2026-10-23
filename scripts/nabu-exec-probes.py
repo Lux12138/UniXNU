@@ -141,5 +141,24 @@ for anchor, label, row in ((DLF, 'dlf', 2420), (DLM, 'dlm', 2500), (MBF, 'mbf', 
     else:
         report.append('  MISS   %s anchor' % label)
 
+
+# free page count at exec time: does page-in have anything to give?
+FREEPG = 'nabu_mark_num ("aas", 1, 2020);'
+if 'nabu_mark_num ("freepg"' in src:
+    report.append('  skip   freepg already present')
+elif FREEPG in src:
+    decl = ('\n/* vm page counters, for the page-in failure hypothesis */\n'
+            'extern unsigned int vm_page_free_count, vm_page_wire_count;\n')
+    if 'extern unsigned int vm_page_free_count' not in src:
+        hdr = '#include <sys/imgact.h>'
+        src = src.replace(hdr, hdr + decl, 1) if hdr in src else decl + src
+    src = src.replace(FREEPG,
+        FREEPG + '\n'
+        '\t\tnabu_mark_num ("freepg", (unsigned long)vm_page_free_count, 2420);\n'
+        '\t\tnabu_mark_num ("wirepg", (unsigned long)vm_page_wire_count, 2500);', 1)
+    report.append('  insert freepg + wirepg rows')
+else:
+    report.append('  MISS   anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
