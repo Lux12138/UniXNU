@@ -10,7 +10,12 @@ OSSymbol, so OSDynamicCast(OSString, ...) returned NULL and the guard short-circ
 Now both types are accepted, and a diagnostic reports on screen whether the guard is armed, so a
 silent miss cannot happen again:
 
-    row 1660   "guard 1" when the class filter is active, "guard 0" when the table names no class
+    row 1310   "guard 1" when the class filter is active, "guard 0" when the table names no class
+
+Row 1310 rather than 1660 because nabu_mark_text clears a ten-line band starting at y-12 before it
+draws. With rows written in the order guard, walk, class, name, a guard at 1660 sat inside the band
+that the walk row (1450, clearing 1438..1738) wipes, so it was erased immediately. At 1310 it is
+above every later band.
 """
 import io
 import sys
@@ -44,7 +49,7 @@ new_guard = '''	// Only services of the class the table asks for are relevant. W
 		} else if (OSSymbol * wm = OSDynamicCast(OSSymbol, wantObj)) {
 			wantName = wm->getCStringNoCopy();
 		}
-		nabu_mark_num("guard", wantName ? 1 : 0, 1660);
+		nabu_mark_num("guard", wantName ? 1 : 0, 1310);
 		if (wantName && !service->metaCast(wantName)) {
 			return false;
 		}
