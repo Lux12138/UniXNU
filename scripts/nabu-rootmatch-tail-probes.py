@@ -103,9 +103,6 @@ after('\tIOService::setRootMedia(service);',
       '\tkprintf("NABU: setRootMedia done\\n");',
       'setRootMedia done')
 
-before('\treturn kIOReturnSuccess;\n}',
-       '\tkprintf("NABU: IOFindBSDRoot success, rootName=%s\\n", rootName);\n',
-       'IOFindBSDRoot success')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
