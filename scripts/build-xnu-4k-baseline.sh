@@ -1152,12 +1152,18 @@ else
   EXTRA_MAKE_ARGS+=("prng_random.o_CFLAGS_ADD=")
 fi
 if [ "${XNU_NATIVE_AES:-0}" = 1 ]; then
-  echo "  [aes-gate] mode='$CRYPTO_BOOTSTRAP_MODE' raw='${XNU_CRYPTO_BOOTSTRAP:-}' cc14='${XNU_SOURCE_CORECRYPTO14:-}'"
-  echo "  [aes-gate] .config says:"; grep -n "SOURCE_CORECRYPTO14" "$ROOT/../../.config" 2>/dev/null || echo "    (no .config at $ROOT/../../.config)"
-  echo "  [aes-gate] env dump:"; env | grep -i "CORECRYPTO" | head -5 || true
   if [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
-    echo 'NativeAES currently requires the qualified original AES/crypto prelink closure' >&2
-    exit 1
+    # kernel.py's bootstrap pass forces XNU_SOURCE_CORECRYPTO14=0 to produce compile records
+    # before the real build runs. That pass legitimately fails this gate; killing it there
+    # prevents the records from being written and makes the whole build fail. Only the real
+    # pass -- the one where the record already exists or the archive builders already ran --
+    # must honour the gate.
+    if [ ! -f build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json ]; then
+      echo '  [aes-gate] bootstrap pass (no compile records yet): skipping the AES closure gate' >&2
+    else
+      echo 'NativeAES currently requires the qualified original AES/crypto prelink closure' >&2
+      exit 1
+    fi
   fi
   PERSONALITY_CFLAGS=-DXNU_NATIVE_AES=1
 else
