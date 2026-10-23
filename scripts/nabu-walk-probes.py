@@ -36,8 +36,10 @@ def after(anchor, addition, label):
     report.append('  insert %s' % label)
 
 
-# the marker prototypes (IOService.cpp does not include nabu_early_mark.h)
-after('#include <IOKit/IOKitDebug.h>',
+# the marker prototypes. IOService.cpp has no IOKitDebug.h include -- its first include is
+# <IOKit/system.h> at line 29 -- which is why the earlier anchor missed and the probes
+# failed to compile with "use of undeclared identifier 'nabu_mark_text'".
+after('#include <IOKit/system.h>',
       '\nextern "C" void nabu_mark_text(const char *s, unsigned int y);\n'
       'extern "C" void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n',
       'declare nabu_mark_*')
