@@ -42,5 +42,30 @@ elif call in src:
 else:
     report.append('  MISS   copyout call anchor')
 
+
+# dynlinker branch: the second copyout into the user stack. The fault's FAR sits at user_stack - 0x90,
+# which is exactly where thread_adjuserstack + copyoutptr land when launchd is dynamically linked.
+DL_ANCHOR = 'if (load_result.dynlinker || load_result.is_rosetta) {'
+if 'nabu_mark_num ("dnk"' in src:
+    report.append('  skip   dnk already present')
+elif DL_ANCHOR in src:
+    src = src.replace(DL_ANCHOR,
+        DL_ANCHOR + '\n'
+        '\t\tnabu_mark_num ("dnk", (unsigned long)(load_result.dynlinker != 0), 2100);', 1)
+    report.append('  insert dnk row')
+else:
+    report.append('  MISS   dynlinker anchor')
+
+CP2 = 'error = copyoutptr(load_result.mach_header, ap, new_ptr_size);'
+if 'nabu_mark_num ("cp2"' in src:
+    report.append('  skip   cp2 already present')
+elif CP2 in src:
+    idx = src.find(CP2)
+    line_end = src.find('\n', idx)
+    src = src[:line_end + 1] + '\t\tnabu_mark_num ("cp2", (unsigned long)error, 2180);\n' + src[line_end + 1:]
+    report.append('  insert cp2 row')
+else:
+    report.append('  MISS   copyoutptr anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
