@@ -1,6 +1,6 @@
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -79,6 +79,7 @@
+@@ -80,6 +80,7 @@
   * Version 2.0.
   */
  
@@ -8,7 +8,7 @@
  #include <sys/param.h>
  #include <sys/filedesc.h>
  #include <sys/kernel.h>
-@@ -799,12 +800,17 @@
+@@ -800,12 +801,17 @@
  	bsd_init_kprintf("calling sysctl_mib_init\n");
  	sysctl_mib_init();
  
@@ -26,7 +26,7 @@
  
  	/*
  	 * We attach the loopback interface *way* down here to ensure
-@@ -1103,9 +1109,13 @@
+@@ -1104,9 +1110,13 @@
  kern_return_t
  bsd_autoconf(void)
  {
