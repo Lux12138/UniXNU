@@ -1,13 +1,10 @@
 #!/usr/bin/env python3
-"""Probe the four blocking points inside waitForMatchingServiceWithToken.
+"""Re-add the wfms probes, but only print when the timeout is finite.
 
-waitForService just forwards to this function, so a 5-second timeout should make it return NULL.
-It does not return at all, so it is stuck at one of:
-
-  6564  LOCKWRITENOTIFY()                       taking the catalogue write lock
-  6570  copyExistingServices(...)               walking every registered service
-  6575  setNotification(gIOMatchedNotification) registering for future matches
-  6581  absolute_timeout / thread wait          the timeout itself
+Every other caller of waitForService passes NULL, which becomes UINT64_MAX, and those calls fire
+constantly -- they filled the screen and buried the one call we care about. IOFindBSDRoot is the
+only caller with a real timeout (5s after the shortening), so gating on
+"timeout != UINT64_MAX" isolates it.
 """
 import io
 import sys
@@ -46,43 +43,42 @@ def before(anchor, addition, label):
     report.append('  insert %s' % label)
 
 
-# entry to the function (only the one with the checkInToken signature)
+# entry: only announce finite timeouts, that is IOFindBSDRoot
 after('IOService::waitForMatchingServiceWithToken( OSDictionary * matching,\n    uint64_t timeout,\n    IOUserServerCheckInToken * checkInToken)\n{',
-      '\tkprintf("NABU: wfms enter timeout=%llu\\n", (unsigned long long)timeout);',
-      'wfms enter')
+      '\tif (UINT64_MAX != timeout) {\n'
+      '\t\tkprintf("NABU: ROOT wfms enter timeout=%llu\\n", (unsigned long long)timeout);\n'
+      '\t}',
+      'ROOT wfms enter')
 
+# gate each later probe on the same condition, one line each
 before('\tLOCKWRITENOTIFY();',
-       '\tkprintf("NABU: wfms before LOCKWRITENOTIFY\\n");\n',
-       'before LOCKWRITENOTIFY')
+       '\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT before lock\\n");\n',
+       'ROOT before lock')
 
 after('\tLOCKWRITENOTIFY();',
-      '\tkprintf("NABU: wfms got write lock\\n");',
-      'got write lock')
+      '\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT got lock\\n");',
+      'ROOT got lock')
 
 before('\t\tresult = (IOService *) copyExistingServices( matching,',
-       '\t\tkprintf("NABU: wfms copyExistingServices enter\\n");\n',
-       'copyExistingServices enter')
+       '\t\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT copyExisting enter\\n");\n',
+       'ROOT copyExisting enter')
 
 after('\t\tresult = (IOService *) copyExistingServices( matching,\n\t\t    kIOServiceMatchedState, kIONotifyOnce );',
-      '\t\tkprintf("NABU: wfms copyExistingServices=%p\\n", (void *)result);',
-      'copyExistingServices result')
+      '\t\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT copyExisting=%p\\n", (void *)result);',
+      'ROOT copyExisting result')
 
 before('\t\tnotify = IOService::setNotification( gIOMatchedNotification, matching,',
-       '\t\tkprintf("NABU: wfms setNotification enter\\n");\n',
-       'setNotification enter')
+       '\t\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT setNotification enter\\n");\n',
+       'ROOT setNotification enter')
 
 after('\t\t    &result, priority );',
-      '\t\tkprintf("NABU: wfms notify=%p\\n", (void *)notify);',
-      'setNotification result')
-
-before('\t\tif (UINT64_MAX != timeout) {',
-       '\t\tkprintf("NABU: wfms arming timeout\\n");\n',
-       'arming timeout')
+      '\t\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT notify=%p\\n", (void *)notify);',
+      'ROOT notify result')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
 print()
 print('bytes: %d -> %d' % (original, len(text)))
 for line in text.split('\n'):
-    if 'NABU: wfms' in line:
-        print('  %s' % line.strip()[:80])
+    if 'NABU: ROOT' in line:
+        print('  %s' % line.strip()[:86])
