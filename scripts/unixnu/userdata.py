@@ -42,13 +42,19 @@ def image_size(dmg):
         info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)],
                              capture_output=True, check=True).stdout
         return plistlib.loads(info)['Size Information']['Total Bytes']
-    # 7-Zip reads DMG natively, LZFSE included, and reports the unpacked member size.
+    # 7z l -slt lists the dmg member first with Comment = Apple_APFS and its unpacked Size;
+    # the inner APFS layer that follows carries no Size at all.
     listing = subprocess.run(['7z', 'l', '-slt', str(dmg)], capture_output=True,
                              text=True, check=True).stdout
-    for block in listing.split('- - -'):
-        heading = dict(line.split(' = ', 1) for line in block.splitlines()
-                       if ' = ' in line and not line.startswith(' '))
-        if heading.get('Type') == 'APFS' and heading.get('Size', '').isdigit():
+    for block in listing.split('----------'):
+        heading = {}
+        for line in block.splitlines():
+            if ' = ' in line and not line.startswith(' '):
+                key, value = line.split(' = ', 1)
+                heading[key] = value
+        if heading.get('Comment') == 'Apple_APFS' and heading.get('Size', '').isdigit():
+            return int(heading['Size'])
+        if heading.get('Type') in ('APFS', 'HFS') and heading.get('Size', '').isdigit():
             return int(heading['Size'])
     raise Error(f'7z reported no APFS member in {dmg}')
 
@@ -67,7 +73,9 @@ def attach(dmg):
     # The caller only reads it sequentially.
     out = dmg.parent / (dmg.stem + '.apfs')
     if not out.is_file():
-        subprocess.run(['7z', 'x', '-y', f'-o{dmg.parent}', str(dmg)], check=True,
+        # 7z returns 2 when it skips a symlink whose target escapes the output tree; the file
+        # contents are unaffected, so only a missing member is fatal.
+        subprocess.run(['7z', 'x', '-y', f'-o{dmg.parent}', str(dmg)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         candidates = sorted(dmg.parent.glob('*.apfs'))
         if not candidates:
