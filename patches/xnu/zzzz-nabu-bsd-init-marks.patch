@@ -15,7 +15,7 @@
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
 +	NABU_MARK(65);
-+	bsd_init_kprintf("NABU: bsd_autoconf returned\n");
++	kprintf("NABU: bsd_autoconf returned\n");
  
  #if CONFIG_DTRACE
  	dtrace_postinit();
@@ -25,10 +25,10 @@
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
-+	bsd_init_kprintf("NABU: before kminit\n");
++	kprintf("NABU: before kminit\n");
 +	NABU_MARK(61);
  	kminit();
-+	bsd_init_kprintf("NABU: after kminit\n");
++	kprintf("NABU: after kminit\n");
 +	NABU_MARK(62);
  
  	/*
