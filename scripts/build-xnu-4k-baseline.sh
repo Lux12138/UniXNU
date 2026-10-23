@@ -176,9 +176,6 @@ fi
 
 # Count IOMedia instances right before the root lookup, and bound the untimed IODTNVRAM wait on the
 # boot-failure path so it cannot hang forever.
-if [ -f "$ROOT/scripts/nabu-media-count.py" ]; then
-  python3 "$ROOT/scripts/nabu-media-count.py" | tail -4
-fi
 
 # Marker squares only, no kprintf. They were dropped together with the probe inserters, but they are
 # the boot progress display and worth keeping. nabu-clean-probes.py strips lines containing 'NABU:'

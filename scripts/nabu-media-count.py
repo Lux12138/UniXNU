@@ -52,23 +52,9 @@ replace(
 replace(
     '''	do {
 		t.tv_sec = ROOTDEVICETIMEOUT;''',
-    '''	/* How many IOMedia instances exist at all? Zero means the UFS block device never published
-	 * one, so no amount of matching will find a root volume. */
-	{
-		OSDictionary * nmm = IOService::serviceMatching("IOMedia");
-		unsigned long nmedia = 0;
-		if (nmm) {
-			OSIterator * nit = IOService::getMatchingServices(nmm);
-			if (nit) {
-				while (nit->getNextObject()) {
-					nmedia++;
-				}
-				nit->release();
-			}
-			nmm->release();
-		}
-		nabu_mark_num("IOMedia", nmedia, 1950);
-	}
+    '''	/* The IOMedia enumeration was removed: walking getMatchingServices() with the block driver
+	 * registered does not return, which stalled the boot between IOFindBSDRoot and the
+	 * waitForService call. walk2 in instanceMatch already proves the device registered. */
 
 	do {
 		t.tv_sec = ROOTDEVICETIMEOUT;''',
