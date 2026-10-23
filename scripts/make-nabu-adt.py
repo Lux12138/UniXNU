@@ -165,6 +165,11 @@ def main():
                         ('#size-cells', struct.pack('<I', 2)),
                         ('ranges', struct.pack('<QQQ', 0, ARMIO_BASE, 0x08000000))],
              [node('intc', [('compatible', b'arm,gic-v3\0'),
+                            # pe_arm_map_interrupt_controller() looks this up with
+                            # SecureDTFindEntry("interrupt-controller", "master", ...), whose
+                            # signature is (propName, propValue). Without this property gPicBase
+                            # stays 0 and no interrupt ever reaches a driver.
+                            ('interrupt-controller', b'master\0'),
                             ('reg', struct.pack('<4Q',
                                                 GIC_DIST - ARMIO_BASE, GIC_DIST_SIZE,
                                                 GIC_REDIST - ARMIO_BASE, GIC_REDIST_SIZE)),

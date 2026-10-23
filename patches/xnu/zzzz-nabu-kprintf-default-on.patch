@@ -29,7 +29,8 @@
 +	/* nabu: unconditional. This runs before the framebuffer is mapped, so a
 +	 * readiness check here never fired; nabu_mark_putc guards g_fb itself and also
 +	 * tees to the PL011 UART. */
-+	PE_kputc = nabu_mark_putc;
++	/* nabu: the console is NOT redirected into the framebuffer. kprintf output is discarded;
++	 * painting it over the panel buried the status rows under the UEFI boot log. */
 +
  }
  STARTUP(KPRINTF, STARTUP_RANK_FIRST, PE_init_kprintf);
