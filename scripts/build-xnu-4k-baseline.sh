@@ -1071,10 +1071,15 @@ for header in Path('refer/libdispatch/os').glob('*.h'):
         target.write_bytes(result.stdout)
 PY
 if [ ! -f "$KERNEL_SDKROOT/.xnu-$XNU_VERSION-headers" ]; then
+  # Xcode 26's clang warns on virtual specifiers inside final classes, and the exported C++
+  # headers are built here rather than with EXTRA_CFLAGS (which is defined later). Without
+  # these the SDK header pass fails on OSSymbol.h before the kernel is even linked.
   make -C .cache/xnu-work installhdrs SDKROOT=macosx ARCH_CONFIGS=ARM64 \
     MACHINE_CONFIGS=BCM2837 KERNEL_CONFIGS=DEVELOPMENT \
     RC_DARWIN_KERNEL_VERSION="$XNU_DARWIN" RC_ProjectSourceVersion="$XNU_VERSION" \
     MAKEJOBS=-j"${JOBS:-4}" OBJROOT="$ROOT/build/xnu/obj" \
+    CFLAGS_EXTRA="-Wno-unnecessary-virtual-specifier -Wno-suggest-override -Wno-suggest-destructor-override" \
+    BUILD_WERROR=0 \
     SYMROOT="$ROOT/build/xnu/sym" DSTROOT="$KERNEL_SDKROOT"
   touch "$KERNEL_SDKROOT/.xnu-$XNU_VERSION-headers"
 fi
