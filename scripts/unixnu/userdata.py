@@ -58,11 +58,9 @@ def is_udif(dmg):
 
 
 def image_size(dmg):
+    """Bytes the window will hold: the raw image for a bare one, the unpacked size for UDIF."""
     if not is_udif(dmg):
         return dmg.stat().st_size
-
-
-def image_size(dmg):
     if HOST == 'Darwin':
         info = subprocess.run(['hdiutil', 'imageinfo', '-plist', str(dmg)],
                              capture_output=True, check=True).stdout
