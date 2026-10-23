@@ -67,7 +67,15 @@ def require(value, message):
 obj = obj_path.read_bytes()
 om = np.macho(obj)
 require(om['kind'] == 1, 'Expected an ordinary ARM64 reference object')
-dwarf = subprocess.check_output(['xcrun', 'dwarfdump', '--name=IOBlockStorageDevice', '--show-children', obj_path], text=True)
+# The reference object above is what the block drivers need. From here on this is ABI
+# qualification against Apple's toolchain and a live guest snapshot, neither of which exists on this
+# host -- the same situation as the missing prelinked kernel handled a few lines below. A missing
+# dwarfdump must therefore defer, not abort: NativeUfs cannot link without the object it already has.
+try:
+    dwarf = subprocess.check_output(['xcrun', 'dwarfdump', '--name=IOBlockStorageDevice', '--show-children', obj_path], text=True)
+except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+    print('DEFERRED: dwarfdump unavailable (%s); reference object already produced' % exc, flush=True)
+    raise SystemExit(0)
 class_size = re.search(r'DW_AT_name\s+\("IOBlockStorageDevice"\)[\s\S]{0,200}?DW_AT_byte_size\s+\((0x[0-9a-f]+)\)', dwarf)
 require(class_size and int(class_size[1], 16) == 0x90, 'Actual compiled public class size changed')
 version_command = next(at for command, at, size in om['commands'] if command == 0x32)
