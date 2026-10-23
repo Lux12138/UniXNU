@@ -1,0 +1,10 @@
+--- a/makedefs/MakeInc.def
++++ b/makedefs/MakeInc.def
+@@ -163,6 +163,7 @@
+ 	-Wno-unaligned-access \
+ 	-Wno-undef \
+ 	-Wno-unused-macros \
++	-Wno-unnecessary-virtual-specifier \
+ 	-Wno-used-but-marked-unused \
+ 	-Wno-variadic-macros \
+ 	-Wno-vla \
