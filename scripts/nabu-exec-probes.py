@@ -101,7 +101,7 @@ elif AAS in src:
     src = src.replace(AAS,
         'nabu_mark_num ("aas", 1, 2020);\n'
         '\t' + AAS + '\n'
-        '\t\tnabu_mark_num ("aasr", (unsigned long)error, 2180);', 1)
+        '\t\t/* retired: 2180 is taken by cp2; cpo0 proves success */', 1)
     report.append('  insert aas + aasr rows')
 else:
     report.append('  MISS   exec_add_apple_strings anchor')
@@ -114,12 +114,32 @@ elif AASAP in src:
     idx = src.find(AASAP)
     line_end = src.find('{', idx)
     if line_end > 0:
-        src = src[:line_end + 1] + '\n\tnabu_mark_num ("aasap", (unsigned long)imgp->ip_endargv, 2100);' + src[line_end + 1:]
+        src = src[:line_end + 1] + '\n\t/* retired: 2100 is taken by dnk */' + src[line_end + 1:]
         report.append('  insert aasap row')
     else:
         report.append('  MISS   function body')
 else:
     report.append('  MISS   function anchor')
+
+
+# the three copyoutptr calls after the dynlinker block
+DLF = 'error = copyoutptr((user_addr_t)load_result.dynlinker_fd, ap, 8);'
+DLM = 'error = copyoutptr(load_result.dynlinker_mach_header, ap + 8, 8);'
+MBF = 'error = copyoutptr((user_addr_t)main_binary_fd, ap + 16, 8);'
+
+for anchor, label, row in ((DLF, 'dlf', 2420), (DLM, 'dlm', 2500), (MBF, 'mbf', 2340)):
+    tag = 'nabu_mark_num ("%s"' % label
+    if tag in src:
+        report.append('  skip   %s already present' % label)
+    elif anchor in src:
+        idx = src.find(anchor)
+        line_end = src.find('\n', idx)
+        src = (src[:line_end + 1] +
+               '\t\tnabu_mark_num ("%s", (unsigned long)error, %d);\n' % (label, row) +
+               src[line_end + 1:])
+        report.append('  insert %s row %d' % (label, row))
+    else:
+        report.append('  MISS   %s anchor' % label)
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
