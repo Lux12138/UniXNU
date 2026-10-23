@@ -115,8 +115,9 @@ setmode(const char *mode_string)
 				perms = (shift >= 0) ? ((mode_t)07 << shift) : 0777;
 			}
 
-			mode_t mask = (shift >= 0) ? ((mode_t)07777 & ~((mode_t)077 << shift))
-			                           : 07777;
+			/* mask is the bit range the who-class governs, not its complement:
+			 * 'u' means 0700, so perms are kept inside it and nothing outside changes. */
+			mode_t mask = (shift >= 0) ? ((mode_t)077 << shift) : (mode_t)0777;
 			switch (op) {
 			case '+':
 				result->set = (mode_t)((result->set & ~mask) | (perms & mask));
