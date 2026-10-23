@@ -8,7 +8,9 @@
  #include <sys/param.h>
  #include <sys/filedesc.h>
  #include <sys/kernel.h>
-@@ -801,6 +802,11 @@
+@@ -799,12 +800,17 @@
+ 	bsd_init_kprintf("calling sysctl_mib_init\n");
+ 	sysctl_mib_init();
  
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
@@ -20,7 +22,12 @@
  	dtrace_postinit();
 +	NABU_MARK(66);
 +	kprintf("NABU: dtrace done\n");
-@@ -1104,7 +1119,11 @@
+ #endif
+ 
+ 	/*
+ 	 * We attach the loopback interface *way* down here to ensure
+@@ -1103,9 +1109,13 @@
+ kern_return_t
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
@@ -32,3 +39,4 @@
  
  	/*
  	 * Early startup for bsd pseudodevices.
+ 	 */
