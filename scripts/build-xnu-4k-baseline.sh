@@ -177,6 +177,10 @@ if [ -f "$ROOT/scripts/nabu-timeout-var-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-timeout-var-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -3
 fi
 
+if [ -f "$ROOT/scripts/nabu-timeout-row-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-timeout-row-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -3
+fi
+
 if [ -f "$ROOT/scripts/nabu-shorten-iosbd-wait.py" ]; then
   python3 "$ROOT/scripts/nabu-shorten-iosbd-wait.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp
 fi
