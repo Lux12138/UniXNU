@@ -170,7 +170,7 @@ elif PF_ANCHOR in src:
     src = src.replace(PF_ANCHOR,
         '\t\t/* NABU: prefault before any stack write -- fault-in panics instead of mapping here. */\n'
         '\t\texec_prefault_data(p, imgp, &load_result);\n'
-        '\t\tnabu_mark_text ("pf-early", 2500);\n'
+        '\t\t/* retired: prefault does not cover the stack */\n'
         + PF_ANCHOR, 1)
     report.append('  insert early prefault')
 else:
@@ -195,6 +195,22 @@ elif MM in src:
     report.append('  insert maxmem + pages rows')
 else:
     report.append('  MISS   freepg anchor')
+
+
+# is `ap` writable? one byte, plain copyout, before the failing copyoutptr
+APTEST = 'uint64_t ap = thread_adjuserstack(thread, -24);'
+if 'ap-ok' in src:
+    report.append('  skip   ap test already present')
+elif APTEST in src:
+    src = src.replace(APTEST,
+        APTEST + '\n'
+        '\t\t{\n'
+        '\t\t\tunsigned char __z = 0;\n'
+        '\t\t\tnabu_mark_text (copyout (&__z, ap, 1) == 0 ? "ap-ok" : "ap-bad", 2500);\n'
+        '\t\t}', 1)
+    report.append('  insert ap writability test')
+else:
+    report.append('  MISS   adjuserstack anchor')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
