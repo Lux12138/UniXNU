@@ -82,7 +82,7 @@ while index < len(arguments):
 # Xcode 26.0.1's clang added -Wunnecessary-virtual-specifier, which fires on the exported xnu
 # C++ headers this driver includes (OSSymbol.h declares a virtual inside a final class). The
 # -Werror below turned it into a build failure before the kernel could link.
-command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
+command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unknown-warning-option', '-Wno-unused-parameter',
                 '-Wno-c99-designator', '-Wno-reorder-init-list', '-Wno-deprecated-enum-enum-conversion',
                 '-Wno-unnecessary-virtual-specifier', '-Wno-suggest-override',
                 '-Wno-suggest-destructor-override',
