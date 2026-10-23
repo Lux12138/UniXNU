@@ -47,7 +47,11 @@ while index < len(arguments):
 command += ['-I', str(out / 'include'), '-I', str(ROOT / '.cache/xnu-work/osfmk'),
             '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-deprecated-declarations',
             '-Wno-c99-designator', '-Wno-reorder-init-list',
-            '-Wno-deprecated-enum-enum-conversion']
+            '-Wno-deprecated-enum-enum-conversion',
+            # Xcode 26.0.1's clang added this warning and it fires on the xnu C++ headers this
+            # reference object includes (OSSymbol.h declares a virtual inside a final class).
+            '-Wno-unnecessary-virtual-specifier', '-Wno-suggest-override',
+            '-Wno-suggest-destructor-override']
 (out / 'compile-command.json').write_text(json.dumps(command, indent=2) + '\n')
 r = subprocess.run(command, cwd=record['directory'], capture_output=True, text=True)
 (out / 'compile.log').write_text(r.stdout + r.stderr)
