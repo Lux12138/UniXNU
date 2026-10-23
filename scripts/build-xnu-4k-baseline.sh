@@ -329,20 +329,20 @@ void nabu_mark_show(int n)
   if (n != last_sys) { last_sys = n; within = 0; }
   within++;
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 240 : 132), n, 18);
+  /* digits removed: the labelled status rows report the same state */
   /* x=320, not 220: draw_number clears 11*s px from x=32, which reached 252 at s=20
    * and clipped this digit in half. */
-  draw_number(320, (g_h > 900 ? g_h - 240 : 132), within, 18);
+  /* digits removed: the labelled status rows report the same state */
 }
 /* Four values at once. One flash/photo cycle should answer several questions, so
  * every probe site can dump a small tuple instead of a single number. */
 void nabu_mark_quad(int a, int b, int c, int d)
 {
   if (g_fb == NULL) { return; }
-  draw_number(32, (g_h > 900 ? g_h - 350 : 132), a, 18);
-  draw_number(220, (g_h > 900 ? g_h - 350 : 132), b, 18);
-  draw_number(32, (g_h > 900 ? g_h - 460 : 300), c, 18);
-  draw_number(220, (g_h > 900 ? g_h - 460 : 300), d, 18);
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
+  /* digits removed: the labelled status rows report the same state */
 }
 /* Draw a value with no bookkeeping: used where the number is data, not a
  * checkpoint (e.g. the kobject type currently being registered). */
@@ -351,7 +351,7 @@ void nabu_mark_val(int v)
   if (g_fb == NULL) { return; }
   /* Separate row from nabu_mark_show: they used to share (32, g_h-320), so this one
    * painted over the subsystem readout and a photo only ever showed the entry id. */
-  draw_number(32, (g_h > 900 ? g_h - 580 : 132), v, 20);
+  /* digits removed: the labelled status rows report the same state */
 }
 
 /* 5x7 glyphs, 5 bytes per character, bit0 = leftmost column of that row. */
@@ -414,7 +414,7 @@ void nabu_mark_putc(char c)
   if (c == '\n' || c == '\r') {
     g_tx = 16;
     g_ty += ch;
-    if (g_ty > (g_h > 200 ? g_h - 40 : 600)) { g_ty = 16; }
+    if (g_ty > (g_h > 200 ? g_h - 780 : 600)) { g_ty = 16; }
     return;
   }
   if (c < 32 || c > 126) { c = ' '; }
@@ -474,12 +474,14 @@ void nabu_mark_text(const char *s, unsigned int y)
   if (((unsigned long)s >> 48) != 0xFFFFUL) { return; }
 
   /* Wipe the band first: leftover UEFI text underneath made glyphs unreadable. */
-  fill(0, y > 20 ? y - 12 : 0, g_w, 10 * lh, 0xFF000000);
+  fill(0, y > 20 ? y - 12 : 0, g_w, lh + 16, 0xFF000000);
 
   per_line = (g_w > left + cw ? (g_w - left - 8) / cw : 30);
   if (per_line == 0) { per_line = 1; }
 
-  for (line = 0; line < 8; line++) {
+  /* One line only: the per-row clear is lh + 16, so a wrapped string would paint across
+   * the rows below and cover them. */
+  for (line = 0; line < 1; line++) {
     len = 0;
     x = left;
     for (i = 0; i < per_line; i++) {
@@ -506,7 +508,7 @@ static void draw_all(void)
 {
   int n;
   if (g_fb == NULL) { return; }
-  fill(0, g_h > 900 ? g_h - 700 : 0, g_w, 700, 0xFF000000);
+  /* No band clear: it erased the status rows on every NABU_MARK. */
   g_slot = 0;
   {
     /* Draw the newest 24 hits, not the lowest 24: with 30+ checkpoints the
@@ -526,14 +528,14 @@ static void draw_all(void)
     }
     for (n = first; n <= NABU_MAX_MARK && g_slot < 24; n++) {
       if ((g_hits[(n - 1) >> 6] & (1ULL << ((n - 1) & 63))) == 0) { continue; }
-      fill(32 + (unsigned int)g_slot * 64, (g_h > 900 ? g_h - 690 : 32), 48, 48, g_palette[(n - 1) & 7]);
+      (void)n;  /* squares removed: they overlapped the status rows */
       g_slot++;
     }
   }
   /* two large digits under the strip: "12" means checkpoint 12 was the last hit */
   /* Own row: this shared (32, g_h-320) with nabu_mark_show subsystem, so the two
    * painted over each other and a photo could not tell which number it was. */
-  draw_number(32, (g_h > 900 ? g_h - 120 : 132), max_hit(), 20);
+  (void)max_hit;  /* digits removed: the labelled rows report the same state */
 }
 /* Replay through an address the caller already knows is kernel-virtual. */
 void nabu_mark_rebind(const unsigned long *v)
