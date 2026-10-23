@@ -176,5 +176,25 @@ elif PF_ANCHOR in src:
 else:
     report.append('  MISS   user_stack anchor')
 
+
+# the memory facts the VM was built from
+MM = 'nabu_mark_num ("freepg", (unsigned long)vm_page_free_count, 2420);'
+if 'nabu_mark_num ("maxmem"' in src:
+    report.append('  skip   maxmem already present')
+elif MM in src:
+    decl = ('\n/* memory facts, for the page-counter sanity check */\n'
+            'extern uint64_t max_mem;\n'
+            'extern uint32_t vm_page_pages;\n')
+    if 'extern uint64_t max_mem' not in src:
+        hdr = '#include <sys/imgact.h>'
+        src = src.replace(hdr, hdr + decl, 1) if hdr in src else decl + src
+    src = src.replace(MM,
+        MM + '\n'
+        '\t\tnabu_mark_num ("maxmem", (unsigned long)(max_mem >> 20), 2340);\n'
+        '\t\tnabu_mark_num ("pages", (unsigned long)vm_page_pages, 2500);', 1)
+    report.append('  insert maxmem + pages rows')
+else:
+    report.append('  MISS   freepg anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
