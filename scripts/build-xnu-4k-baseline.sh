@@ -153,6 +153,10 @@ if [ -f "$ROOT/scripts/nabu-iofindbsdroot-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-iofindbsdroot-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -3
 fi
 
+if [ -f "$ROOT/scripts/nabu-setconf-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-setconf-probes.py" .cache/xnu-work/bsd/kern/bsd_init.c | tail -3
+fi
+
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
