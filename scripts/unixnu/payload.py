@@ -145,7 +145,7 @@ def build(ctx, kernel=None):
     initrd = 'initrd = "Payloads/scratch-data.img"\n' if data else ''
     loader = '' if spec.get('loader', 'firmware') == 'firmware' else '[[driver]]\npath = "Payloads/DarwinBoot.efi"\n'
     (stage / 'EFI/UniXNU/unixnu.toml').write_text(
-        f'version = 1\n[boot]\ntimeout = {spec.get("timeout", 3)}\ndefault = "xnu"\n[kits]\nautoload = false\n{loader}'
+        f'version = 1\n[boot]\ntimeout = {spec.get("timeout", 0)}\ndefault = "xnu"\n[kits]\nautoload = false\n{loader}'
         f'[[entry]]\nid = "xnu"\ntitle = "{spec.get("title", "UniXNU")}"\ntype = "xnu"\npath = "Payloads/kernel.macho"\n{initrd}'
         f'args = "{line}"\n')
     for path in [stage, *stage.rglob('*')]:
