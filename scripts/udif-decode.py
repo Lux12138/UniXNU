@@ -133,8 +133,8 @@ def decode(src, dst, info_only=False):
     print('koly: version=%(version)d flags=%(flags)d' % trailer)
     print('      data fork at %(data_offset)d (%(data_length)d bytes)' % trailer)
     print('      xml at %(xml_offset)d (%(xml_length)d bytes)' % trailer)
-    print('      sector_count=%(sector_count)d (%.2f GiB)' % (
-        trailer['sector_count'], trailer['sector_count'] * 512 / 2**30))
+    gib = trailer['sector_count'] * 512 / 2**30
+    print('      sector_count=%d (%.2f GiB)' % (trailer['sector_count'], gib))
 
     blob, name = _blkx(data, trailer)
     print('blkx: %r' % name)
