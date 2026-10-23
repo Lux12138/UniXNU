@@ -43,15 +43,16 @@ def before(anchor, addition, label):
 
 
 # right after the assignment
+# Three-shot guards: the mount loop retries hundreds of times a second now that the timeout
+# computes to zero, and ungated prints cover the screen in overlapping copies.
 after('\t\tt.tv_sec = ROOTDEVICETIMEOUT;\n\t\tt.tv_nsec = 0;',
-      '\t\tkprintf("NABU: t set addr=%p sec=%u nsec=%u\\n",\n'
-      '\t\t    (void *)&t, (unsigned)t.tv_sec, (unsigned)t.tv_nsec);',
+      '\t\t{ static int n = 0; if (n++ < 3) kprintf("NABU: t set addr=%p sec=%u nsec=%u\\n",\n'
+      '\t\t    (void *)&t, (unsigned)t.tv_sec, (unsigned)t.tv_nsec); }',
       't after assignment')
 
-# immediately before the call
 before('\t\tservice = IOService::waitForService( matching, &t );',
-       '\t\tkprintf("NABU: t before call addr=%p sec=%u nsec=%u\\n",\n'
-       '\t\t    (void *)&t, (unsigned)t.tv_sec, (unsigned)t.tv_nsec);\n',
+       '\t\t{ static int n = 0; if (n++ < 3) kprintf("NABU: t before call addr=%p sec=%u nsec=%u\\n",\n'
+       '\t\t    (void *)&t, (unsigned)t.tv_sec, (unsigned)t.tv_nsec); }\n',
        't before call')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
