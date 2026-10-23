@@ -1092,6 +1092,9 @@ fi
 #   OSSymbol.h:383:15: error: virtual method 'isEqualTo' is inside a 'final' class
 # EXTRA_CFLAGS only reaches the kernel objects; the header pass is earlier. Insert the
 # suppressions into the warning set itself, which CWARNFLAGS_STD and CXXWARNFLAGS_STD both extend.
+echo "  [clang26] pwd=$(pwd) ROOT=$ROOT"
+ls -d .cache/xnu-work/makedefs 2>/dev/null || echo "  [clang26] .cache/xnu-work/makedefs missing"
+ls -d "$ROOT/.cache/xnu-work/makedefs" 2>/dev/null || echo "  [clang26] \$ROOT/.cache/xnu-work/makedefs missing"
 if [ -f .cache/xnu-work/makedefs/MakeInc.def ]; then
   if ! grep -q 'Wno-unnecessary-virtual-specifier' .cache/xnu-work/makedefs/MakeInc.def; then
     python3 - <<'CLANG26'
