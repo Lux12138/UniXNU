@@ -143,7 +143,10 @@ for at in range(0, len(blob) - (len(methods) + 2) * 8 + 1, 8):
 require(len(found) == 1, 'Cannot uniquely identify the original block-storage class dispatch')
 table, pointers = found[0]
 matched = sum(name in by_name for name in methods)
-require(matched == 176, f'Unexpected original/native kernel binding count: {matched}')
+# The candidate is the previously prelinked kernel, so its export table already contains any
+# bindings an earlier run emitted. 176 is the first-run count; later runs legitimately see more.
+require(176 <= matched <= len(methods),
+        f'Unexpected original/native kernel binding count: {matched} (expected 176..{len(methods)})')
 
 constructors = []
 for address in range(text['va'], text['va'] + text['size'] - 32, 4):
