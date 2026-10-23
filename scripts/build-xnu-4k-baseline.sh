@@ -1107,7 +1107,14 @@ if [ ! -f "$KERNEL_SDKROOT/.xnu-$XNU_VERSION-headers" ]; then
   touch "$KERNEL_SDKROOT/.xnu-$XNU_VERSION-headers"
 fi
 if [ ! -f "$KERNEL_SDKROOT/usr/local/lib/kernel/libfirehose_kernel.a" ]; then
-  bash scripts/build-firehose.sh
+  # libfirehose_kernel comes from an xcodebuild target on macOS. The Linux toolchain ships a
+  # replacement that compiles the single source the target compiles and generates the two MIG
+  # outputs by hand.
+  if [ -x scripts/build-firehose-linux.sh ] && [ "$(uname -s)" = Linux ]; then
+    bash scripts/build-firehose-linux.sh
+  else
+    bash scripts/build-firehose.sh
+  fi
 fi
 # Xcode 26.0.1's clang added -Wunnecessary-virtual-specifier. xnu-10063's WARNFLAGS_STD is
 # -Weverything with -Werror in the middle, so the exported C++ headers fail before the kernel
