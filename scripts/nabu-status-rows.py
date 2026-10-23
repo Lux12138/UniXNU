@@ -120,7 +120,7 @@ COUNT_MEDIA = (
     '\t\t\t\tfor (int __i = 0; __nk[__i]; ++__i) { __uuid[__i] = __nk[__i]; }\n'
     '\t\t\t}\n'
     '\t\t\tnabu_mark_num ("iomedia", (unsigned long)__nmedia, 1780);\n'
-    '\t\t\tnabu_mark_text (__uuid, 1860);\n'
+    '\t\t\tnabu_mark_text (__uuid, 2180);\n'
     '\t\t}\n'
 )
 
