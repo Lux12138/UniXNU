@@ -66,6 +66,14 @@ after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * r
       '\t}\n',
       'row 1520 entry')
 
+
+after('mach_timespec_t     t;',
+      '\n\t/* Initialise the timeout: this variable was read uninitialised and passed straight to\n'
+      '\t * waitForService below, so the call could never time out. 3s makes the result observable. */\n'
+      '\tt.tv_sec = 3;\n'
+      '\tt.tv_nsec = 0;\n',
+      'row timeout init')
+
 # 2. before and after the wait
 before('\t\tservice = IOService::waitForService( matching, &t );',
        '\t\tnabu_mark_text("A call wfs", 2500);\n',
@@ -74,6 +82,34 @@ before('\t\tservice = IOService::waitForService( matching, &t );',
 after('\t\tservice = IOService::waitForService( matching, &t );',
       '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2500);',
       'row 1550 B after call')
+
+
+# 4. replace the sleeping wait with a busy poll
+# waitForService parks the thread and relies on a timer-interrupt wakeup; sleeping does not work here
+# yet (5s timeout never fires), while busy waits do. Ask the catalogue directly instead.
+SLEEPY = '\t\tservice = IOService::waitForService( matching, &t );'
+BUSY = (
+    '\t\t/* NABU: busy poll instead of waitForService -- sleeping does not come back yet. */\n'
+    '\t\tservice = NULL;\n'
+    '\t\t{\n'
+    '\t\t\tuint64_t __deadline = mach_absolute_time () + 5000000000ULL;\n'
+    '\t\t\tdo {\n'
+    '\t\t\t\tOSIterator *__it = IOService::getMatchingServices (matching);\n'
+    '\t\t\t\tif (__it) {\n'
+    '\t\t\t\t\tservice = OSDynamicCast (IOService, __it->getNextObject ());\n'
+    '\t\t\t\t\t__it->release ();\n'
+    '\t\t\t\t}\n'
+    '\t\t\t\tif (service) break;\n'
+    '\t\t\t\tfor (unsigned __s = 0; __s < 20000; ++__s) { __asm__ volatile ("yield" ::: "memory"); }\n'
+    '\t\t\t} while (mach_absolute_time () < __deadline);\n'
+    '\t\t}\n'
+)
+# substitution, not insertion: the original call must disappear
+if SLEEPY in text:
+    text = text.replace(SLEEPY, BUSY, 1)
+    report.append('  replace row busy poll instead of waitForService')
+else:
+    report.append('  MISS   row busy poll instead of waitForService')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
