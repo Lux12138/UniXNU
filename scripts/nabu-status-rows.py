@@ -61,7 +61,8 @@ after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * r
       '\t\tfor (unsigned spin = 0; spin < 200000; ++spin) { __asm__ volatile ("yield" ::: "memory"); }\n'
       '\t\tuint64_t t2 = mach_absolute_time ();\n'
       '\t\t/* tA is known non-zero (3967735401); only the delta matters. */\n'
-      '\t\tnabu_mark_num ("tD", (unsigned long)(t2 - t1), 1860);\n'
+      '\t\tnabu_mark_text (t2 > t1 ? "clock:advances" : "clock:STUCK", 1780);\n'
+      '\t\t/* literal strings: the numeric path was silent even though tD is in the kernel */\n'
       '\t}\n',
       'row 1520 entry')
 
