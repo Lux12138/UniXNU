@@ -44,14 +44,18 @@ after('#include <IOKit/system.h>',
       'extern "C" void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n',
       'declare nabu_mark_*')
 
-# entry into instanceMatch: count this service and name it
+# entry into instanceMatch: count this service, name it, and name its class.
+# Rows are 70px apart because ten-to-thirty-pixel spacing made the lines overlap on screen.
 after('\tdone = 0;\n\tdo{',
       '\t{\n'
       '\t\tstatic unsigned long walkN = 0;\n'
-      '\t\tnabu_mark_num("walk", ++walkN, 1560);\n'
-      '\t\tnabu_mark_text(service->getName(), 1580);\n'
+      '\t\tOSMetaClass * walkMC = service->getMetaClass();\n'
+      '\t\t++walkN;\n'
+      '\t\tnabu_mark_num("walk", walkN, 1450);\n'
+      '\t\tnabu_mark_text(walkMC ? walkMC->getClassName() : "?", 1520);\n'
+      '\t\tnabu_mark_text(service->getName(), 1590);\n'
       '\t}\n',
-      'walk counter + service name')
+      'walk counter + class name + service name')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
