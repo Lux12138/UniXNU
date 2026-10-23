@@ -92,8 +92,9 @@ BUSY = (
     '\t\t/* NABU: busy poll instead of waitForService -- sleeping does not come back yet. */\n'
     '\t\tservice = NULL;\n'
     '\t\t{\n'
-    '\t\t\tuint64_t __deadline = mach_absolute_time () + 5000000000ULL;\n'
-    '\t\t\tdo {\n'
+    '\t\t\t/* Count passes: mach_absolute_time units are not nanoseconds here, so a\n'
+    '\\t\\t\\t * +5000000000ULL deadline ran for thousands of seconds. 200 is bounded. */\n'
+    '\t\t\tfor (unsigned __try = 0; __try < 200 && !service; ++__try) {\n'
     '\t\t\t\tOSIterator *__it = IOService::getMatchingServices (matching);\n'
     '\t\t\t\tif (__it) {\n'
     '\t\t\t\t\tservice = OSDynamicCast (IOService, __it->getNextObject ());\n'
@@ -101,7 +102,7 @@ BUSY = (
     '\t\t\t\t}\n'
     '\t\t\t\tif (service) break;\n'
     '\t\t\t\tfor (unsigned __s = 0; __s < 20000; ++__s) { __asm__ volatile ("yield" ::: "memory"); }\n'
-    '\t\t\t} while (mach_absolute_time () < __deadline);\n'
+    '\t\t\t}\n'
     '\t\t}\n'
 )
 # substitution, not insertion: the original call must disappear
