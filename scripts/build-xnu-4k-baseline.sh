@@ -174,6 +174,13 @@ if [ -f "$ROOT/scripts/nabu-status-rows.py" ]; then
   python3 "$ROOT/scripts/nabu-status-rows.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
 fi
 
+# Marker squares only, no kprintf. They were dropped together with the probe inserters, but they are
+# the boot progress display and worth keeping. nabu-clean-probes.py strips lines containing 'NABU:'
+# (with a colon) and does not touch NABU_MARK, so the two coexist.
+if [ -f "$ROOT/scripts/nabu-marks-only.py" ]; then
+  python3 "$ROOT/scripts/nabu-marks-only.py"
+fi
+
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
