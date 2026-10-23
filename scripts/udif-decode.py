@@ -130,8 +130,8 @@ def decode(src, dst, info_only=False, only=None):
     print('koly: version=%(version)d flags=%(flags)d' % koly)
     print('      data fork at %(data_offset)d (%(data_length)d bytes)' % koly)
     print('      xml at %(xml_offset)d (%(xml_length)d bytes)' % koly)
-    print('      whole image sector_count=%(sector_count)d (%.2f GiB)'
-          % (koly['sector_count'], koly['sector_count'] * 512 / 2**30))
+    whole = koly['sector_count'] * 512 / 2**30
+    print('      whole image sector_count=%d (%.2f GiB)' % (koly['sector_count'], whole))
 
     parts = entries(data, koly)
     print('partitions: %d' % len(parts))
