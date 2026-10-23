@@ -128,7 +128,11 @@ def main():
                         # without it the driver returns false immediately ('match for observability
                         # only') and no block device is ever published. diagnostics=1 makes a
                         # failure panic with the full report instead of failing silently.
-                        ('boot-args', b'-enable_kprintf_spam native-ufs-root=1 native-ufs-diagnostics=1\0'),
+                        # maxmem caps xmaxmem in arm_init.c. Without it xmaxmem stays 0, mem_size comes straight from
+                        # boot_args->memSize, and avail_end lands at 373 GB -- which makes pmap_startup
+                        # build a 91-million-page free list on a machine with about 1.2 million pages.
+                        # 4864 MiB matches owned_memory_size = 0x130000000 exactly.
+                        ('boot-args', b'-enable_kprintf_spam native-ufs-root=1 native-ufs-diagnostics=1 maxmem=4864\0'),
                         ('osenvironment', b'main\0'),
                         *([('certificate-production-status', struct.pack('<I', 0)), ('effective-production-status-ap', struct.pack('<I', 0)),
                            ('certificate-security-mode', struct.pack('<I', 1)), ('effective-security-mode-sep', struct.pack('<I', 1))]
