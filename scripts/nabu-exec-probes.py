@@ -67,5 +67,30 @@ elif CP2 in src:
 else:
     report.append('  MISS   copyoutptr anchor')
 
+
+# create_unix_stack: the numbers behind the protect range
+USZ = 'if (load_result->user_stack_alloc_size > 0) {'
+if 'nabu_mark_num ("usz"' in src:
+    report.append('  skip   usz already present')
+elif USZ in src:
+    src = src.replace(USZ,
+        USZ + '\n'
+        '\t\tnabu_mark_num ("usz", (unsigned long)load_result->user_stack_alloc_size, 1780);', 1)
+    report.append('  insert usz row')
+else:
+    report.append('  MISS   alloc_size anchor')
+
+PRT = 'prot_size = vm_map_trunc_page(size - load_result->user_stack_size, vm_map_page_mask(map));'
+if 'nabu_mark_num ("prt"' in src:
+    report.append('  skip   prt already present')
+elif PRT in src:
+    src = src.replace(PRT,
+        PRT + '\n'
+        '\t\tnabu_mark_num ("prt", (unsigned long)prot_size, 1860);\n'
+        '\t\tnabu_mark_num ("rls", (unsigned long)load_result->user_stack_size, 1940);', 1)
+    report.append('  insert prt + rls rows')
+else:
+    report.append('  MISS   protect anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
