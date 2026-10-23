@@ -1,55 +1,7 @@
---- a/bsd/kern/bsd_init.c
-+++ b/bsd/kern/bsd_init.c
-@@ -80,4 +80,5 @@
-  * Version 2.0.
-  */
- 
- #include <sys/param.h>
-+#include "../../osfmk/arm/nabu_early_mark.h"
-@@ -924,2 +925,5 @@
- 	bsd_init_kprintf("calling bsd_autoconf\n");
- 	bsd_autoconf();
-+	NABU_MARK(65);
-+	kprintf("NABU: bsd_autoconf returned\n");
-+	kprintf("NABU: dtrace_postinit\n");
-@@ -928,1 +932,3 @@
- 	dtrace_postinit();
-+	NABU_MARK(66);
-+	kprintf("NABU: dtrace done\n");
-@@ -942,2 +948,5 @@
-+	NABU_MARK(67);
-+	kprintf("NABU: loopattach\n");
- 	bsd_init_kprintf("calling loopattach\n");
- 	loopattach();                   /* XXX */
-+	kprintf("NABU: loopattach done\n");
-@@ -957,2 +966,5 @@
-+	NABU_MARK(68);
-+	kprintf("NABU: ether_family_init\n");
- 	bsd_init_kprintf("calling ether_family_init\n");
- 	ether_family_init();
-+	kprintf("NABU: ether done\n");
-@@ -999,2 +1011,5 @@
-+	NABU_MARK(69);
-+	kprintf("NABU: net_init_run\n");
- 	bsd_init_kprintf("calling net_init_run\n");
- 	net_init_run();
-+	kprintf("NABU: net done\n");
-@@ -1003,2 +1018,5 @@
-+	NABU_MARK(70);
-+	kprintf("NABU: inittodr\n");
- 	bsd_init_kprintf("calling inittodr\n");
- 	inittodr(0);
-+	kprintf("NABU: inittodr done\n");
-@@ -1016,1 +1034,3 @@
- 		bsd_init_kprintf("vfs_mountroot\n");
-+		NABU_MARK(71);
-+		kprintf("NABU: vfs_mountroot enter\n");
-@@ -1293,4 +1313,8 @@
- bsd_autoconf(void)
- {
- 	kprintf("bsd_autoconf: calling kminit\n");
-+	kprintf("NABU: before kminit\n");
-+	NABU_MARK(61);
- 	kminit();
-+	kprintf("NABU: after kminit\n");
-+	NABU_MARK(62);
+# The bsd_init probes are installed by scripts/nabu-bsd-init-probes.py, which
+# build-xnu-4k-baseline.sh runs right after the patch loop.
+#
+# They used to live here as a unified diff, but a diff has to reproduce the tree's line numbers and
+# exact context after 64 other patches have been applied, and git apply silently drops a hunk that
+# misses by more than a few lines. The inserter matches on unique anchors instead and reports every
+# insertion and skip.

@@ -141,6 +141,14 @@ for PATCH in "$ROOT"/patches/xnu/*.patch "$ROOT"/kits/NativePrelink/patches/*.pa
     git -C .cache/xnu-work apply "$PATCH"
   fi
 done
+# --- nabu: bsd_init probes (diagnostic only) ---
+# Inserted by text rather than by diff: a unified diff has to match line numbers against a tree
+# that already carries 64 other patches, and git apply drops a hunk that misses by more than a few
+# lines without failing the build. The inserter keys on unique anchors and is safe to repeat.
+if [ -f "$ROOT/scripts/nabu-bsd-init-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-bsd-init-probes.py" .cache/xnu-work/bsd/kern/bsd_init.c | tail -4
+fi
+
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
 # patches/xnu/zzz-boot-progress.patch both edit osfmk/arm/arm_init.c, and
