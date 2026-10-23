@@ -54,12 +54,23 @@ if [ -d .cache/xnu-work/.git ]; then
   echo "nabu: xnu-work reset to $(git -C .cache/xnu-work rev-parse --short HEAD) before patching"
 fi
 
-# Xcode 16.2 clang does not accept -mach_msg2 (added in later toolchains); strip it
-set -x
+# Xcode 16's mig rejects -mach_msg2; newer Xcode and the Linux mig accept it. The Linux toolchain
+# builds mig from bootstrap_cmds' cross_platform branch, which handles the flag, so this step only
+# matters on Darwin. Upstream UniXNU and Allenwdk/UniXNU carry no such block at all.
+if [ "$(uname -s)" = Darwin ]; then
 grep -rl -- '-mach_msg2' .cache/xnu-work --include='*.mk' --include='Makefile*' --include='*.template' --include='*.xcconfig' 2>/dev/null | while read -r f; do
-  sed -i '' 's/-mach_msg2//g' "$f"
+  # BSD sed takes -i '' for "no backup"; GNU sed wants the expression directly after -i, so the
+  # same line fails silently there: sed reads s/-mach_msg2//g as a filename, leaves the flag in
+  # place, and the tree later fails in init_sysent.c with a run of "expected expression".
+  # -i.bak works on both, and the backup is removed afterwards.
+  if sed --version 2>/dev/null | grep -q GNU; then
+    sed -i 's/-mach_msg2//g' "$f"
+  else
+    sed -i '' 's/-mach_msg2//g' "$f"
+  fi
   echo "patched: $f"
 done || true
+fi
 if [ ! -x .cache/fakeroot/usr/local/libexec/availability.pl ]; then
   if [ ! -d refer/AvailabilityVersions/.git ]; then
     git clone --depth 1 --branch "$AVAILABILITY_TAG" https://github.com/apple-oss-distributions/AvailabilityVersions.git refer/AvailabilityVersions
