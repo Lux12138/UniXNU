@@ -1,0 +1,12 @@
+--- a/bsd/kern/bsd_init.c
++++ b/bsd/kern/bsd_init.c
+@@ -1104,7 +1104,9 @@
+ bsd_autoconf(void)
+ {
+ 	kprintf("bsd_autoconf: calling kminit\n");
++	kprintf("NABU: before kminit\n");
+ 	kminit();
++	kprintf("NABU: after kminit\n");
+ 
+ 	/*
+ 	 * Early startup for bsd pseudodevices.
