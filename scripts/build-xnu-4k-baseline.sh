@@ -1725,13 +1725,16 @@ fi
     # the real IOBlockStorageDevice.cpp with the kernel's own compile arguments into
     # build/storage-abi/IOBlockStorageDevice-reference.o; linking that object supplies
     # the base class, its vtable and gMetaClass so make-stage linking succeeds.
-    STORAGE_REF=$ROOT/build/storage-abi/IOBlockStorageDevice-reference.o
-    if [ -f "$STORAGE_REF" ]; then
-      KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES $STORAGE_REF"
-      echo "nabu: linking $STORAGE_REF for IOBlockStorageDevice"
-    else
-      echo "nabu: WARNING storage reference object missing; NativeUfs will not link" >&2
-    fi
+    # Do NOT link IOBlockStorageDevice-reference.o. It defines the very class the IOStorageFamily
+    # kext already provides, so linking it registers a second metaclass and the kernel panics:
+    #
+    #   Metaclass:: kext com.apple.iokit.IOStorageFamily class IOBlockStorageDevice
+    #     is a duplicate class __kernel__
+    #
+    # The symbols belong to a kext, so leave them undefined and let the prelinked IOStorageFamily
+    # supply the single instance at load time.
+    KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-undefined,dynamic_lookup"
+    echo "nabu: IOBlockStorageDevice left to the prelinked IOStorageFamily (no reference object)" 
   fi
   if [ "${XNU_NATIVE_ADRENO:-0}" = 1 ]; then
     # NativeAdreno plus its kits (scripts/build-native-adreno-kits.py). No personality is installed: the
