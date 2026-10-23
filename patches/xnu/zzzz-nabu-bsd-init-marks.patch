@@ -8,8 +8,6 @@
  #include <sys/param.h>
  #include <sys/filedesc.h>
  #include <sys/kernel.h>
---- a/bsd/kern/bsd_init.c
-+++ b/bsd/kern/bsd_init.c
 @@ -801,6 +802,11 @@
  
  	bsd_init_kprintf("calling bsd_autoconf\n");
@@ -22,9 +20,7 @@
  	dtrace_postinit();
 +	NABU_MARK(66);
 +	kprintf("NABU: dtrace done\n");
---- a/bsd/kern/bsd_init.c
-+++ b/bsd/kern/bsd_init.c
-@@ -1104,7 +1107,11 @@
+@@ -1104,7 +1119,11 @@
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
