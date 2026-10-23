@@ -20,7 +20,38 @@
 +	NABU_MARK(66);
 +	kprintf("NABU: dtrace done\n");
  #endif
-@@ -1291,8 +1297,12 @@
+@@ -948,4 +954,7 @@
+ 	bsd_init_kprintf("calling loopattach\n");
++	NABU_MARK(67);
++	kprintf("NABU: loopattach\n");
+ 	loopattach();                   /* XXX */
++	kprintf("NABU: loopattach done\n");
+ #endif
+ #if NGIF
+@@ -963,4 +972,7 @@
+ 	/* Register the built-in dlil ethernet interface family */
+ 	bsd_init_kprintf("calling ether_family_init\n");
++	NABU_MARK(68);
++	kprintf("NABU: ether_family_init\n");
+ 	ether_family_init();
++	kprintf("NABU: ether done\n");
+ #endif /* ETHER */
+@@ -1005,3 +1017,6 @@
+ 	bsd_init_kprintf("calling net_init_run\n");
++	NABU_MARK(69);
++	kprintf("NABU: net_init_run\n");
+ 	net_init_run();
++	kprintf("NABU: net done\n");
+ #endif /* NETWORKING */
+@@ -1009,4 +1024,7 @@
+ 	bsd_init_kprintf("calling inittodr\n");
++	NABU_MARK(70);
++	kprintf("NABU: inittodr\n");
+ 	inittodr(0);
++	kprintf("NABU: inittodr done\n");
+ 
+ 	/* Mount the root file system. */
+@@ -1291,8 +1309,12 @@
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
