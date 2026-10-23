@@ -14,7 +14,7 @@
  // disable_serial_output disables kprintf() *and* unbuffered panic output.
 -SECURITY_READ_ONLY_LATE(bool) disable_serial_output = true;
 +/* nabu: kprintf() requires BOTH flags false; serial output here means the PE_kputc
-+ * sink we install, which is our framebuffer + PL011 tee, not a real DBG2 UART. */
++ * sink, which is not a real DBG2 UART on this board. */
 +SECURITY_READ_ONLY_LATE(bool) disable_serial_output = false;
  // disable_kprintf_output only disables kprintf().
 -SECURITY_READ_ONLY_LATE(bool) disable_kprintf_output = true;
@@ -22,16 +22,12 @@
  // disable_iolog_serial_output only disables IOLog, controlled by
  // SERIALMODE_NO_IOLOG.
  SECURITY_READ_ONLY_LATE(bool) disable_iolog_serial_output = false;
-@@ -68,6 +71,11 @@
+@@ -68,6 +71,8 @@
  		 */
  		PE_kputc = console_write_unbuffered;
  	}
-+	/* nabu: unconditional. This runs before the framebuffer is mapped, so a
-+	 * readiness check here never fired; nabu_mark_putc guards g_fb itself and also
-+	 * tees to the PL011 UART. */
 +	/* nabu: the console is NOT redirected into the framebuffer. kprintf output is discarded;
 +	 * painting it over the panel buried the status rows under the UEFI boot log. */
-+
  }
  STARTUP(KPRINTF, STARTUP_RANK_FIRST, PE_init_kprintf);
  
