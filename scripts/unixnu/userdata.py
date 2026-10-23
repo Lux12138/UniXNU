@@ -26,6 +26,7 @@ import sys
 
 HOST = sys.platform
 
+from . import udif
 from .ipsw import Ipsw
 from .util import Error, log, run, sha256_file, tool
 
@@ -38,23 +39,9 @@ def paths(ctx):
     return out, out / 'userdata-root.img', out / 'userdata-root.json'
 
 
-KOLY = b'koly'
-
-
 def is_udif(dmg):
-    """Only a UDIF container needs unpacking; anything else is already a disk image.
-
-    The two components are different kinds of object. 044-76040-038.dmg (OS) is UDIF: bvxn chunks
-    at the front, a koly trailer at the back. 044-76034-038.dmg (SystemOS) is a sealed APFS volume
-    copied out whole -- file(1) reports APFS, 7z reports Type = APFS with SEALED_VOLUME, and its
-    first bytes are neither NXSB nor bvxn. The image just has to be carried across byte for byte,
-    so the test is "is this UDIF", not "can 7z open it".
-    """
     with open(dmg, 'rb') as handle:
-        head = handle.read(4)
-        handle.seek(-512, io.SEEK_END)
-        trailer = handle.read(4)
-    return head == b'bvxn' or head == b'bvx2' or trailer == KOLY
+        return udif.is_udif(handle)
 
 
 def image_size(dmg):
@@ -82,31 +69,38 @@ def image_size(dmg):
     raise Error(f'7z reported no APFS member in {dmg}')
 
 def attach(dmg):
-    """Attach read-only without mounting; return the whole-disk device."""
+    """Return a path to the raw APFS image this dmg carries.
+
+    A bare image is handed back untouched. A UDIF container is unpacked by walking its mish block
+    map, which is what hdiutil would do on macOS -- 7-Zip walks the same map but ends up with the
+    file tree instead of the raw partition, and build() needs the raw bytes.
+    """
     if not is_udif(dmg):
         return str(dmg)
-    if HOST == 'Darwin':
-        out = subprocess.run(['hdiutil', 'attach', '-nomount', '-readonly', '-noverify',
-                             '-noautofsck', str(dmg)],
-                             capture_output=True, text=True, check=True).stdout
-        for line in out.splitlines():
-            match = re.match(r'(/dev/disk\d+)\s', line)
-            if match:
-                return match.group(1)
-        raise Error('could not find the attached disk device')
-    # No hdiutil here: unpack the APFS member to a file beside the dmg and return its path.
-    # The caller only reads it sequentially.
+
     out = dmg.parent / (dmg.stem + '.apfs')
-    if not out.is_file():
-        # 7z returns 2 when it skips a symlink whose target escapes the output tree; the file
-        # contents are unaffected, so only a missing member is fatal.
-        subprocess.run(['7z', 'x', '-y', f'-o{dmg.parent}', str(dmg)],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        candidates = sorted(dmg.parent.glob('*.apfs'))
-        if not candidates:
-            raise Error(f'7z produced no apfs member from {dmg}')
-        if candidates[0] != out:
-            candidates[0].rename(out)
+    if out.is_file() and out.stat().st_size:
+        return str(out)
+
+    with open(dmg, 'rb') as handle:
+        trailer = udif.read_trailer(handle)
+        handle.seek(trailer['plist_offset'])
+        plist = plistlib.loads(handle.read(trailer['plist_length']))
+
+        entry = None
+        for item in plist['resource-fork']['blkx']:
+            if item.get('Name') in ('Apple_APFS', 'Apple_HFS', 'Apple_HFSX'):
+                entry = item
+                break
+        if entry is None:
+            raise Error(f'no APFS or HFS partition in {dmg}')
+
+        runs = udif.read_runs(entry.get('Data', entry.get('data')))
+        log(f'userdata: unpacking {entry.get("Name")} '
+            f'({sum(r["sectors"] for r in runs) * 512 >> 20} MiB, {len(runs)} runs)')
+
+        with open(out, 'wb') as sink:
+            udif.unpack(handle, sink, runs, trailer['data_offset'])
     return str(out)
 
 
