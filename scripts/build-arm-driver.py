@@ -80,7 +80,7 @@ command.extend(['-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',
                 '-I', str(ROOT / '.cache/xnu-work/osfmk')])
 if component in ('NativeVirtioBlock', 'NativeRamBlock', 'NativeUfs'):
     command += ['-I', str(ROOT / 'build/storage-abi/include')]
-    if args.verified_root and not getattr(args, 'unverified', False):
+    if args.verified_root:
         command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'), '-DNATIVE_VERIFIED_BLOCK=1']
     if args.negative_verified_block:
         command += ['-DNATIVE_VERIFIED_BLOCK_INJECT_FAULT=1']
@@ -95,12 +95,15 @@ if component == 'NativeUfs':
     # --unverified is the bring-up alternative UniXNU-uke uses: compile the transport with the
     # policy bundle switched off so the running controller can be adopted before any signed
     # policy exists. Without it the build requires kits/VerifiedRoot, which this tree lacks.
-    command += ['-I', str(ROOT / 'drivers/NativeVirtioBlock'), '-mgeneral-regs-only']
+    # verified_root.h and VerifiedBlockPolicy.h are included unconditionally at the top of
+    # NativeUfs.cpp; only the bodies are behind #if NATIVE_VERIFIED_BLOCK. The include path is
+    # therefore required in both modes -- the switch decides whether the policy path compiles in.
+    command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'),
+                '-I', str(ROOT / 'drivers/NativeVirtioBlock'), '-mgeneral-regs-only']
     if args.unverified:
         command += ['-DNATIVE_VERIFIED_BLOCK=0']
     else:
-        command += ['-I', str(ROOT / 'kits/VerifiedRoot/include'),
-                    '-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
+        command += ['-DNATIVE_VERIFIED_BLOCK=1', '-DNATIVE_VERIFIED_BLOCK_MULTI_POLICY=1']
 if component=='NativeOfflineGPU':
     command += ['-I',str(ROOT/'drivers/NativeVirtioConsole')]
 if component in ('NativeLegacyDisplay','NativeHidInput'):
