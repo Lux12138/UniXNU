@@ -31,3 +31,21 @@ else:
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
+
+# also probe pmap.c when that file is passed
+if SRC.endswith('pmap.c'):
+    pm = io.open(SRC, encoding='utf-8').read()
+    rep2 = []
+    R2 = 'avail_page_count = atop(end - first);'
+    if 'NABU-RANGE' in pm:
+        rep2.append('  skip   range panic already present')
+    elif R2 in pm:
+        pm = pm.replace(R2,
+            'avail_page_count = atop(end - first);\n'
+            '\tpanic ("NABU-RANGE end=%llx first=%llx pages=%u",\n'
+            '\t    (unsigned long long)end, (unsigned long long)first, avail_page_count);', 1)
+        io.open(SRC, 'w', encoding='utf-8', newline='').write(pm)
+        rep2.append('  insert range panic')
+    else:
+        rep2.append('  MISS   avail_page_count anchor')
+    print('\n'.join(rep2))

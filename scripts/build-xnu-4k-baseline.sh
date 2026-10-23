@@ -179,6 +179,9 @@ fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/arm_init.c | tail -4
 fi
+if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/pmap/pmap.c | tail -4
+fi
 
 # Count IOMedia instances right before the root lookup, and bound the untimed IODTNVRAM wait on the
 # boot-failure path so it cannot hang forever.
