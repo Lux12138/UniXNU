@@ -18,6 +18,9 @@ def after(anchor, addition, label):
     if addition in text:
         report.append('  skip   %s' % label)
         return
+    # insert on a fresh line: a probe glued to the anchor's last token compiles but is unreadable
+    if not anchor.endswith('\n'):
+        anchor = anchor + '\n'
     index = text.find(anchor)
     if index < 0:
         report.append('  MISS   %s' % label)
