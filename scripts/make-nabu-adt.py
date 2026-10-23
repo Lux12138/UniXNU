@@ -170,7 +170,6 @@ def main():
                             # signature is (propName, propValue). Without this property gPicBase
                             # stays 0 and no interrupt ever reaches a driver.
                             ('interrupt-controller', b'master\0'),
-                            ('name', b'interrupt-controller\0'),
                             ('reg', struct.pack('<4Q',
                                                 GIC_DIST - ARMIO_BASE, GIC_DIST_SIZE,
                                                 GIC_REDIST - ARMIO_BASE, GIC_REDIST_SIZE)),
