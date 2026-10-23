@@ -1152,6 +1152,7 @@ else
   EXTRA_MAKE_ARGS+=("prng_random.o_CFLAGS_ADD=")
 fi
 if [ "${XNU_NATIVE_AES:-0}" = 1 ]; then
+  echo "  [aes-gate] mode='$CRYPTO_BOOTSTRAP_MODE' raw='${XNU_CRYPTO_BOOTSTRAP:-}' cc14='${XNU_SOURCE_CORECRYPTO14:-}'"
   if [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
     echo 'NativeAES currently requires the qualified original AES/crypto prelink closure' >&2
     exit 1
