@@ -8,10 +8,7 @@
  #include <sys/param.h>
  #include <sys/filedesc.h>
  #include <sys/kernel.h>
-@@ -800,12 +801,17 @@
- 	bsd_init_kprintf("calling sysctl_mib_init\n");
- 	sysctl_mib_init();
- 
+@@ -924,9 +925,14 @@
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
 +	NABU_MARK(65);
@@ -26,8 +23,7 @@
  
  	/*
  	 * We attach the loopback interface *way* down here to ensure
-@@ -1104,9 +1110,13 @@
- kern_return_t
+@@ -1291,8 +1297,12 @@
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
