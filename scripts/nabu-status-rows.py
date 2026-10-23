@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Keep one status line, on a row the console never reaches.
+"""Insert the status rows by anchor.
 
-Console occupies roughly y=240..1450 on this panel (1600 tall). The status rows were written at
-1440..1500, right inside that band, so they were overwritten or stacked with console text.
+Corrections after inspecting the file:
 
-Everything that has already been established is dropped: the whole bsd_autoconf..inittodr run
-succeeds, IOFindBSDRoot is entered, IOBSD matches, root-matching is present, the RAMDisk is created,
-and execution stops inside waitForService. None of that needs reporting again.
+  * IOKitBSDInit.cpp already includes nabu_early_mark.h at line 29, so no separate declaration is
+    needed -- that is why the declaration anchor missed.
+  * copyExistingServices is not in this file at all; it lives in IOService.cpp. The walk marker is
+    therefore dropped from this file rather than pointed at a nonexistent anchor.
 
-What remains is a single letter at y=1520 that changes as execution moves:
+Rows sit below the console band (console covers roughly y=240..1450 of 1600):
 
-    A  waitForService entered
-    B  waitForService returned (and whether it returned non-NULL)
+  1520  IOFindBSDRoot entered
+  1550  A call wfs  ->  B returned N
 """
 import io
 import sys
@@ -22,40 +22,47 @@ original = len(text)
 report = []
 
 
-def replace(old, new, label):
+def after(anchor, addition, label):
     global text
-    if new in text and old not in text:
+    if addition.strip() and addition.strip() in text:
         report.append('  skip   %s' % label)
         return
-    if old not in text:
+    a = anchor if anchor.endswith('\n') else anchor + '\n'
+    idx = text.find(a)
+    if idx < 0:
         report.append('  MISS   %s' % label)
         return
-    text = text.replace(old, new, 1)
-    report.append('  change %s' % label)
+    end = idx + len(a)
+    text = text[:end] + addition + text[end:]
+    report.append('  insert %s' % label)
 
 
-# move the entry marker far below the console band
-replace('	nabu_mark_text("IOFindBSDRoot", 1440);',
-        '	nabu_mark_text("IOFindBSDRoot entered", 1520);',
-        'row 1520 entry')
+def before(anchor, addition, label):
+    global text
+    if addition.strip() and addition.strip() in text:
+        report.append('  skip   %s' % label)
+        return
+    idx = text.find(anchor)
+    if idx < 0:
+        report.append('  MISS   %s' % label)
+        return
+    text = text[:idx] + addition + text[idx:]
+    report.append('  insert %s' % label)
 
-# the timeout write and the post-call write move to 1550 and gain a visible letter
-replace('''		nabu_mark_num("wfs sec", (unsigned long)t.tv_sec, 1470);''',
-        '''		nabu_mark_text("A call wfs", 1550);''',
-        'row 1550 A before call')
 
-replace('''		nabu_mark_num("wfs returned", (unsigned long)(service != NULL), 1470);''',
-        '''		nabu_mark_num("B returned", (unsigned long)(service != NULL), 1550);''',
-        'row 1550 B after call')
+# 1. IOFindBSDRoot entry
+after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * root, u_int32_t * oflags )\n{',
+      '\tnabu_mark_text("IOFindBSDRoot entered", 1520);\n',
+      'row 1520 entry')
 
-# the IOMedia walk marker, also below the console band
-replace('		nabu_mark_text("walking IOMedia", 1500);',
-        '		nabu_mark_text("walking IOMedia", 1580);',
-        'row 1580 walk')
+# 2. before and after the wait
+before('\t\tservice = IOService::waitForService( matching, &t );',
+       '\t\tnabu_mark_text("A call wfs", 1550);\n',
+       'row 1550 A before call')
 
-replace('		nabu_mark_num("copyExisting", (unsigned long)(result != NULL), 1500);',
-        '		nabu_mark_num("walk result", (unsigned long)(result != NULL), 1580);',
-        'row 1580 walk result')
+after('\t\tservice = IOService::waitForService( matching, &t );',
+      '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 1550);',
+      'row 1550 B after call')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
@@ -63,4 +70,4 @@ print()
 print('bytes: %d -> %d' % (original, len(text)))
 for line in text.split('\n'):
     if 'nabu_mark' in line:
-        print('  %s' % line.strip()[:80])
+        print('  %s' % line.strip()[:84])
