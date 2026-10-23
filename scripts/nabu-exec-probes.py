@@ -92,5 +92,34 @@ elif PRT in src:
 else:
     report.append('  MISS   protect anchor')
 
+
+# exec_add_apple_strings: the last writer into the user stack
+AAS = 'error = exec_add_apple_strings(imgp, &load_result);'
+if 'nabu_mark_num ("aasr"' in src:
+    report.append('  skip   aas probes already present')
+elif AAS in src:
+    src = src.replace(AAS,
+        'nabu_mark_num ("aas", 1, 2020);\n'
+        '\t' + AAS + '\n'
+        '\t\tnabu_mark_num ("aasr", (unsigned long)error, 2180);', 1)
+    report.append('  insert aas + aasr rows')
+else:
+    report.append('  MISS   exec_add_apple_strings anchor')
+
+# what does it actually write? capture the stack pointer it uses
+AASAP = 'exec_add_apple_strings(struct image_params *imgp, const load_result_t *load_result)'
+if 'nabu_mark_num ("aasap"' in src:
+    report.append('  skip   aasap already present')
+elif AASAP in src:
+    idx = src.find(AASAP)
+    line_end = src.find('{', idx)
+    if line_end > 0:
+        src = src[:line_end + 1] + '\n\tnabu_mark_num ("aasap", (unsigned long)imgp->ip_endargv, 2100);' + src[line_end + 1:]
+        report.append('  insert aasap row')
+    else:
+        report.append('  MISS   function body')
+else:
+    report.append('  MISS   function anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
