@@ -55,7 +55,8 @@ new_guard = '''	// Only services of the class the table asks for are relevant. W
 		const OSMetaClass * gwmc = service->getMetaClass();
 		const char * gname = gwmc ? gwmc->getClassName() : NULL;
 		int gexact = (wantName && gname && strcmp(gname, wantName) == 0) ? 1 : 0;
-		nabu_mark_num("guard", wantName ? (gexact ? 2 : 1) : 0, 1850);
+		nabu_mark_text(wantName ? wantName : "(none)", 1800);
+		nabu_mark_text(gname ? gname : "(none)", 1870);
 		if (wantName && !gexact) {
 			return false;
 		}
