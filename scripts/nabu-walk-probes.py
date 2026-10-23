@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Report which IOMedia service the walk stops on.
+"""Name the service the IOMedia walk dies on.
 
-waitForService(IOMedia+UUID) never returns while waitForService(IOResources+IOBSD) does, and the
-timeout is a valid 5 seconds, so the block is inside the walk -- before the timeout can fire, which
-also means it holds IOCatalogue and no deadline is observed.
+waitForService(IOMedia+UUID) never returns while waitForService(IOResources+IOBSD) does, with a
+valid 5-second timeout, so the block is inside the walk -- before the deadline can fire, meaning the
+IOCatalogue lock is held and no timeout is observed either.
 
-copyExistingServices is the walk. Print the name of the service currently being examined on one
-fixed row; the last name left on screen is the one it died on. One row, overwritten each time, so it
-cannot flood the console.
+instanceMatch runs once per service being examined. Writing the service name to a fixed row on every
+call leaves the last one examined on screen when the walk stops; a counter row shows how far it got.
+
+Rows (below the console band, alongside the existing status rows):
+  1560  walk=N            how many services examined
+  1580  the name of the service being examined right now
 """
 import io
 import sys
@@ -33,16 +36,20 @@ def after(anchor, addition, label):
     report.append('  insert %s' % label)
 
 
-# the file needs the marker prototypes
-if 'nabu_mark_text' not in text.split('IOService::waitForService')[0]:
-    after('#include <IOKit/IOKitDebug.h>',
-          '\nextern "C" void nabu_mark_text(const char *s, unsigned int y);\n',
-          'declare nabu_mark_text')
+# the marker prototypes (IOService.cpp does not include nabu_early_mark.h)
+after('#include <IOKit/IOKitDebug.h>',
+      '\nextern "C" void nabu_mark_text(const char *s, unsigned int y);\n'
+      'extern "C" void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n',
+      'declare nabu_mark_*')
 
-# inside the walk: mark each service as it is examined
-after('\tresult = (IOService *) copyExistingServices( matching,',
-      '\tnabu_mark_text("copyExisting entered", 1600);',
-      'row 1600 walk entered')
+# entry into instanceMatch: count this service and name it
+after('\tdone = 0;\n\tdo{',
+      '\t{\n'
+      '\t\tstatic unsigned long walkN = 0;\n'
+      '\t\tnabu_mark_num("walk", ++walkN, 1560);\n'
+      '\t\tnabu_mark_text(service->getName(), 1580);\n'
+      '\t}\n',
+      'walk counter + service name')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
@@ -51,9 +58,3 @@ print('bytes: %d -> %d' % (original, len(text)))
 for line in text.split('\n'):
     if 'nabu_mark' in line:
         print('  %s' % line.strip()[:84])
-
-print()
-print('=== where copyExistingServices itself lives ===')
-for i, line in enumerate(text.split('\n'), 1):
-    if 'copyExistingServices(' in line and ('OSIterator' in line or '::' in line or 'static' in line):
-        print('%5d %s' % (i, line.strip()[:96]))

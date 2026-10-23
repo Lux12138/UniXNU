@@ -181,6 +181,12 @@ if [ -f "$ROOT/scripts/nabu-marks-only.py" ]; then
   python3 "$ROOT/scripts/nabu-marks-only.py"
 fi
 
+# Name the service the IOMedia walk dies on. instanceMatch runs once per service examined; the last
+# name left on the fixed row when the boot stops is the one it blocked inside.
+if [ -f "$ROOT/scripts/nabu-walk-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-walk-probes.py" .cache/xnu-work/iokit/Kernel/IOService.cpp | tail -3
+fi
+
 
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
