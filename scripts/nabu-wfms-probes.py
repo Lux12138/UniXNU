@@ -51,11 +51,13 @@ after('IOService::waitForMatchingServiceWithToken( OSDictionary * matching,\n   
       'ROOT wfms enter')
 
 # gate each later probe on the same condition, one line each
-before('\tLOCKWRITENOTIFY();',
+# LOCKWRITENOTIFY() appears several times in this file; only this sequence is unique to
+# waitForMatchingServiceWithToken, where 'timeout' is actually in scope.
+lock_anchor = '\tLOCKWRITENOTIFY();\n\tdo{\n\t\tif (cancelArgs.canceled) {'
+before(lock_anchor,
        '\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT before lock\\n");\n',
        'ROOT before lock')
-
-after('\tLOCKWRITENOTIFY();',
+after(lock_anchor,
       '\tif (UINT64_MAX != timeout) kprintf("NABU: ROOT got lock\\n");',
       'ROOT got lock')
 
