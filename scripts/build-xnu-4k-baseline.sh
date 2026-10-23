@@ -187,6 +187,13 @@ if [ -f "$ROOT/scripts/nabu-walk-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-walk-probes.py" .cache/xnu-work/iokit/Kernel/IOService.cpp | tail -3
 fi
 
+# The fix, not a probe: when the match table names IOProviderClass, skip services of any other class.
+# Without it a table carrying IOPropertyMatch visits every service and reads the named properties on
+# each, and IODTNVRAM nodes block there because their property lookups go through NVRAM.
+if [ -f "$ROOT/scripts/nabu-skip-nonmedia.py" ]; then
+  python3 "$ROOT/scripts/nabu-skip-nonmedia.py" .cache/xnu-work/iokit/Kernel/IOService.cpp | tail -3
+fi
+
 
 # --- nabu: early checkpoint markers (diagnostic only) ---
 # Placed AFTER the patch loop: patches/xnu/native-4k-user-abi.patch and
