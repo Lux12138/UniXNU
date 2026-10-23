@@ -1222,8 +1222,15 @@ if [ "$MOCKFS_MODE" != 0 ] && [ "$MOCKFS_MODE" != 1 ]; then
   exit 1
 fi
 if [ "$MOCKFS_MODE" = 1 ] && { [ "${XNU_ARMCPU:-0}" != 1 ] || [ "${XNU_SOURCE_PTHREAD:-0}" != 1 ]; }; then
-  echo 'The offline executable-root fixture requires the real CPU/pthread components' >&2
-  exit 1
+  # Same bootstrap exemption as the AES closure gate: kernel.py's record pass forces
+  # XNU_ARMCPU=0 and XNU_SOURCE_PTHREAD=0, so this combination only means the real build is
+  # missing the components. Skip it when no compile records exist yet.
+  if [ ! -f build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/osfmk/DEVELOPMENT/startup.o.json ]; then
+    echo '  [mockfs-gate] bootstrap pass: skipping the CPU/pthread requirement' >&2
+  else
+    echo 'The offline executable-root fixture requires the real CPU/pthread components' >&2
+    exit 1
+  fi
 fi
 MOCKFS_OBJECT_DIR=$ROOT/build/xnu/ios-obj/DEVELOPMENT_ARM64_BCM2837/bsd/DEVELOPMENT
 if [ -d "$MOCKFS_OBJECT_DIR" ]; then
