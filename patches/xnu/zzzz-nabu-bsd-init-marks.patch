@@ -1,7 +1,0 @@
-# The bsd_init probes are installed by scripts/nabu-bsd-init-probes.py, which
-# build-xnu-4k-baseline.sh runs right after the patch loop.
-#
-# They used to live here as a unified diff, but a diff has to reproduce the tree's line numbers and
-# exact context after 64 other patches have been applied, and git apply silently drops a hunk that
-# misses by more than a few lines. The inserter matches on unique anchors instead and reports every
-# insertion and skip.
