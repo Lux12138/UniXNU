@@ -1,57 +1,50 @@
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -80,6 +80,7 @@
+@@ -80,4 +80,5 @@
   * Version 2.0.
   */
  
-+#include "../../osfmk/arm/nabu_early_mark.h"
  #include <sys/param.h>
- #include <sys/filedesc.h>
- #include <sys/kernel.h>
-@@ -924,6 +925,11 @@
++#include "../../osfmk/arm/nabu_early_mark.h"
+@@ -924,2 +925,5 @@
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
 +	NABU_MARK(65);
 +	kprintf("NABU: bsd_autoconf returned\n");
 +	kprintf("NABU: dtrace_postinit\n");
- 
- #if CONFIG_DTRACE
+@@ -928,1 +932,3 @@
  	dtrace_postinit();
 +	NABU_MARK(66);
 +	kprintf("NABU: dtrace done\n");
- #endif
-@@ -948,4 +954,7 @@
- 	bsd_init_kprintf("calling loopattach\n");
+@@ -942,2 +948,5 @@
 +	NABU_MARK(67);
 +	kprintf("NABU: loopattach\n");
+ 	bsd_init_kprintf("calling loopattach\n");
  	loopattach();                   /* XXX */
 +	kprintf("NABU: loopattach done\n");
- #endif
- #if NGIF
-@@ -963,4 +972,7 @@
- 	/* Register the built-in dlil ethernet interface family */
- 	bsd_init_kprintf("calling ether_family_init\n");
+@@ -957,2 +966,5 @@
 +	NABU_MARK(68);
 +	kprintf("NABU: ether_family_init\n");
+ 	bsd_init_kprintf("calling ether_family_init\n");
  	ether_family_init();
 +	kprintf("NABU: ether done\n");
- #endif /* ETHER */
-@@ -1005,3 +1017,6 @@
- 	bsd_init_kprintf("calling net_init_run\n");
+@@ -999,2 +1011,5 @@
 +	NABU_MARK(69);
 +	kprintf("NABU: net_init_run\n");
+ 	bsd_init_kprintf("calling net_init_run\n");
  	net_init_run();
 +	kprintf("NABU: net done\n");
- #endif /* NETWORKING */
-@@ -1009,4 +1024,7 @@
- 	bsd_init_kprintf("calling inittodr\n");
+@@ -1003,2 +1018,5 @@
 +	NABU_MARK(70);
 +	kprintf("NABU: inittodr\n");
+ 	bsd_init_kprintf("calling inittodr\n");
  	inittodr(0);
 +	kprintf("NABU: inittodr done\n");
- 
- 	/* Mount the root file system. */
-@@ -1291,8 +1309,12 @@
+@@ -1016,1 +1034,3 @@
+ 		bsd_init_kprintf("vfs_mountroot\n");
++		NABU_MARK(71);
++		kprintf("NABU: vfs_mountroot enter\n");
+@@ -1293,4 +1313,8 @@
  bsd_autoconf(void)
  {
  	kprintf("bsd_autoconf: calling kminit\n");
@@ -60,7 +53,3 @@
  	kminit();
 +	kprintf("NABU: after kminit\n");
 +	NABU_MARK(62);
- 
- 	/*
- 	 * Early startup for bsd pseudodevices.
- 	 */
