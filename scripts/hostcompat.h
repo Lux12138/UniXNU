@@ -12,10 +12,16 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <sys/types.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* BSD setmode/getmode. Declared here because this header is force-included, and installfile.c
+ * uses the pair without including the header that declares them on Darwin. */
+void *setmode(const char *mode_string);
+mode_t getmode(const void *set, mode_t base);
 
 /* Darwin: getprogname() returns the short program name. glibc has
  * program_invocation_short_name, which is the same thing. */
