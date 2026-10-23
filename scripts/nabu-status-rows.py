@@ -52,16 +52,16 @@ def before(anchor, addition, label):
 
 # 1. IOFindBSDRoot entry
 after('IOFindBSDRoot( char * rootName, unsigned int rootNameSize,\n    dev_t * root, u_int32_t * oflags )\n{',
-      '\tnabu_mark_text("IOFindBSDRoot entered", 2150);\n',
+      '\tnabu_mark_text("IOFindBSDRoot entered", 2250);\n',
       'row 1520 entry')
 
 # 2. before and after the wait
 before('\t\tservice = IOService::waitForService( matching, &t );',
-       '\t\tnabu_mark_text("A call wfs", 2220);\n',
+       '\t\tnabu_mark_text("A call wfs", 2350);\n',
        'row 1550 A before call')
 
 after('\t\tservice = IOService::waitForService( matching, &t );',
-      '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2220);',
+      '\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2350);',
       'row 1550 B after call')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)

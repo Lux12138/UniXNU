@@ -495,7 +495,9 @@ void nabu_mark_text(const char *s, unsigned int y)
   per_line = (g_w > left + cw ? (g_w - left - 8) / cw : 30);
   if (per_line == 0) { per_line = 1; }
 
-  for (line = 0; line < 8; line++) {
+  /* One line only: the per-row clear is lh + 16, so a wrapped string would paint across
+   * the rows below and cover them. */
+  for (line = 0; line < 1; line++) {
     len = 0;
     x = left;
     for (i = 0; i < per_line; i++) {

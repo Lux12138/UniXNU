@@ -49,11 +49,8 @@ after('#include <IOKit/system.h>',
 after('\tdone = 0;\n\tdo{',
       '\t{\n'
       '\t\tstatic unsigned long walkN = 0;\n'
-      '\t\tconst OSMetaClass * walkMC = service->getMetaClass();\n'
       '\t\t++walkN;\n'
-      '\t\tnabu_mark_num("walk", walkN, 1940);\n'
-      '\t\tnabu_mark_text(walkMC ? walkMC->getClassName() : "?", 2010);\n'
-      '\t\tnabu_mark_text(service->getName(), 2080);\n'
+      '\t\tnabu_mark_num("walk", walkN, 2050);\n'
       '\t}\n',
       'walk counter + class name + service name')
 
