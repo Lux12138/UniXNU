@@ -160,5 +160,21 @@ elif FREEPG in src:
 else:
     report.append('  MISS   anchor')
 
+
+# Move the prefault ahead of the stack writes: fault-in cannot be relied on here.
+# exec_prefault_data is declared void, so this only proves it ran before the writes.
+PF_ANCHOR = '\t\tap = p->user_stack;'
+if 'nabu_mark_text ("pf-early"' in src:
+    report.append('  skip   early prefault already present')
+elif PF_ANCHOR in src:
+    src = src.replace(PF_ANCHOR,
+        '\t\t/* NABU: prefault before any stack write -- fault-in panics instead of mapping here. */\n'
+        '\t\texec_prefault_data(p, imgp, &load_result);\n'
+        '\t\tnabu_mark_text ("pf-early", 2500);\n'
+        + PF_ANCHOR, 1)
+    report.append('  insert early prefault')
+else:
+    report.append('  MISS   user_stack anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
