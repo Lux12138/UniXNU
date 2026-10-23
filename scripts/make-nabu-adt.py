@@ -124,7 +124,11 @@ def main():
                         # clears it when -enable_kprintf_spam is present in boot-args.
                         # Without this property the kernel prints nothing at all and
                         # the boot log is invisible by design.
-                        ('boot-args', b'-enable_kprintf_spam\0'),
+                        # native-ufs-root=1 is what NativeUfs::start() checks before touching the controller:
+                        # without it the driver returns false immediately ('match for observability
+                        # only') and no block device is ever published. diagnostics=1 makes a
+                        # failure panic with the full report instead of failing silently.
+                        ('boot-args', b'-enable_kprintf_spam native-ufs-root=1 native-ufs-diagnostics=1\0'),
                         ('osenvironment', b'main\0'),
                         *([('certificate-production-status', struct.pack('<I', 0)), ('effective-production-status-ap', struct.pack('<I', 0)),
                            ('certificate-security-mode', struct.pack('<I', 1)), ('effective-security-mode-sep', struct.pack('<I', 1))]
