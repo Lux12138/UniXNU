@@ -89,7 +89,10 @@ def build(ctx, modules):
         except Error:
             if not record.is_file():
                 raise
-    build_archives(ctx, env)
+    # The bootstrap pass runs without CONFIG_XNU_BUILD_ARCHIVES: the archives are what
+    # need the prelink candidate this pass produces, so running them here recurses.
+    if ctx.need_config().get('XNU_BUILD_ARCHIVES') is True:
+        build_archives(ctx, env)
     run(['bash', script], cwd=ctx.tree, env=env, log_file=ctx.logs / 'kernel.log')
 
 
