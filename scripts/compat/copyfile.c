@@ -12,6 +12,36 @@ const char *copyfile_strerror(int error)
 	return strerror(error);
 }
 
+int fcopyfile(int from_fd, int to_fd, copyfile_state_t state, uint32_t flags)
+{
+	(void)state;
+	(void)flags;
+
+	if (from_fd < 0 || to_fd < 0) {
+		errno = EBADF;
+		return -1;
+	}
+
+	char buffer[65536];
+	ssize_t got;
+	int result = 0;
+
+	while ((got = read(from_fd, buffer, sizeof(buffer))) > 0) {
+		ssize_t written = 0;
+		while (written < got) {
+			ssize_t n = write(to_fd, buffer + written, (size_t)(got - written));
+			if (n < 0) {
+				return -1;
+			}
+			written += n;
+		}
+	}
+	if (got < 0) {
+		result = -1;
+	}
+	return result;
+}
+
 int copyfile(const char *from, const char *to, copyfile_state_t state, uint32_t flags)
 {
 	(void)state;

@@ -43,6 +43,7 @@ typedef int (*copyfile_callback_t)(int, int, copyfile_state_t, const char *, con
 #define COPYFILE_QUIT           2
 
 int copyfile(const char *from, const char *to, copyfile_state_t state, uint32_t flags);
+int fcopyfile(int from_fd, int to_fd, copyfile_state_t state, uint32_t flags);
 const char *copyfile_strerror(int error);
 
 #ifdef __cplusplus
