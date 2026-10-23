@@ -1127,10 +1127,12 @@ if [ "${XNU_ARMCPU:-0}" = 1 ] && { [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ] || \
   echo 'ArmCpu bring-up requires the real source provider and a real platform driver' >&2
   exit 1
 fi
+echo '  [gate] arm-dt-platform ok' >&2
 if [ "${XNU_SOURCE_PTHREAD:-0}" = 1 ] && [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
   echo 'The current pthread source-link recipe requires XNU_SOURCE_CORECRYPTO14=1' >&2
   exit 1
 fi
+echo '  [gate] pthread ok' >&2
 CRYPTO_BOOTSTRAP_MODE=${XNU_CRYPTO_BOOTSTRAP:-source}
 if [ "$CRYPTO_BOOTSTRAP_MODE" != source ] && [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ]; then
   echo 'XNU_CRYPTO_BOOTSTRAP must be source or prelinked' >&2
@@ -1143,6 +1145,7 @@ if [ -d "$CRYPTO_OBJECT_DIR" ]; then
   fi
   printf '%s\n' "$CRYPTO_BOOTSTRAP_MODE" > "$CRYPTO_OBJECT_DIR/.crypto-bootstrap-mode"
 fi
+echo '  [gate] crypto-mode ok' >&2
 if [ "$CRYPTO_BOOTSTRAP_MODE" = prelinked ]; then
   # The original component must initialize through real OSKext startup.
   # Only this source-provider entry is omitted; no POST or missing-provider
@@ -1151,6 +1154,7 @@ if [ "$CRYPTO_BOOTSTRAP_MODE" = prelinked ]; then
 else
   EXTRA_MAKE_ARGS+=("prng_random.o_CFLAGS_ADD=")
 fi
+echo '  [gate] crypto-dir writable' >&2
 if [ "${XNU_NATIVE_AES:-0}" = 1 ]; then
   if [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
     # kernel.py's bootstrap pass forces XNU_SOURCE_CORECRYPTO14=0 to produce compile records
