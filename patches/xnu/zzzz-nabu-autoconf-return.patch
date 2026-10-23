@@ -1,8 +1,11 @@
 --- a/bsd/kern/bsd_init.c
 +++ b/bsd/kern/bsd_init.c
-@@ -802,3 +802,6 @@
+@@ -801,6 +801,8 @@
+ 
  	bsd_init_kprintf("calling bsd_autoconf\n");
  	bsd_autoconf();
 +	/* nabu: prove the kernel survived bsd_autoconf(). */
 +	bsd_init_kprintf("NABU: bsd_autoconf returned\n");
  
+ #if CONFIG_DTRACE
+ 	dtrace_postinit();
