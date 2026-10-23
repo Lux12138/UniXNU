@@ -171,7 +171,8 @@ possible.update({'__ZN20IOBlockStorageDeviceC2EPK11OSMetaClass': constructors[0]
 
 object_path = out / (component + '.o')
 require(object_path.is_file(), f'Build {component}.o before this binder')
-undefined = subprocess.check_output(['xcrun', 'nm', '-u', '-j', object_path], text=True).split()
+# GNU nm cannot read an ARM64 Mach-O object; llvm-nm can and emits the same -u -j listing.
+undefined = subprocess.check_output(['llvm-nm', '-u', '-j', object_path], text=True).split()
 undefined = [name for name in undefined if 'IOBlockStorageDevice' in name]
 require(undefined, f'No original block-storage imports found in {component}.o')
 missing = [name for name in undefined if name not in possible]
@@ -179,7 +180,9 @@ require(not missing, 'Unqualified original storage import: ' + ', '.join(missing
 bindings = {name: possible[name] for name in undefined}
 assembly = out / 'original-bindings.S'
 assembly.write_text(''.join(f'.globl {name}\n.set {name}, {value:#x}\n' for name, value in sorted(bindings.items())))
-subprocess.run(['xcrun', 'clang', '-target', 'arm64-apple-ios17.0', '-Werror', '-Wno-incompatible-sysroot',
+# xcrun on this host execs a missing /usr/bin/target-clang; call clang directly, exactly as the
+# kernel build does for its own assembly.
+subprocess.run(['clang', '-target', 'arm64-apple-ios17.0', '-Werror', '-Wno-incompatible-sysroot',
                 '-c', assembly, '-o', out / 'original-bindings.o'], check=True)
 archive = out / ('lib' + component + '.a')
 archive.unlink(missing_ok=True)
