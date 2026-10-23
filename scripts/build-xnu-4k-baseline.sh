@@ -1153,6 +1153,8 @@ else
 fi
 if [ "${XNU_NATIVE_AES:-0}" = 1 ]; then
   echo "  [aes-gate] mode='$CRYPTO_BOOTSTRAP_MODE' raw='${XNU_CRYPTO_BOOTSTRAP:-}' cc14='${XNU_SOURCE_CORECRYPTO14:-}'"
+  echo "  [aes-gate] .config says:"; grep -n "SOURCE_CORECRYPTO14" "$ROOT/../../.config" 2>/dev/null || echo "    (no .config at $ROOT/../../.config)"
+  echo "  [aes-gate] env dump:"; env | grep -i "CORECRYPTO" | head -5 || true
   if [ "$CRYPTO_BOOTSTRAP_MODE" != prelinked ] || [ "${XNU_SOURCE_CORECRYPTO14:-0}" != 1 ]; then
     echo 'NativeAES currently requires the qualified original AES/crypto prelink closure' >&2
     exit 1
