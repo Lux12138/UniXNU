@@ -50,7 +50,7 @@ after('\tdone = 0;\n\tdo{',
       '\t{\n'
       '\t\tstatic unsigned long walkN = 0;\n'
       '\t\t++walkN;\n'
-      '\t\tnabu_mark_num("walk", walkN, 2050);\n'
+      '\t\tnabu_mark_num("walk", walkN, 2150);\n'
       '\t}\n',
       'walk counter + class name + service name')
 
