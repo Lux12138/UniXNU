@@ -113,6 +113,16 @@ if component == 'NativeAdreno':
 result = subprocess.run(command, cwd=record['directory'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 (out / 'compile.log').write_text(result.stdout)
 if result.returncode:
+    # The tail alone is useless under -Weverything: the last 3500 characters are warnings, and the
+    # errors that mattered sit above them. Quote the error lines first.
+    _lines = result.stdout.split('\n')
+    _picked = []
+    for _index, _line in enumerate(_lines):
+        if 'error:' in _line:
+            _picked.extend(_lines[max(0, _index - 1):min(len(_lines), _index + 3)])
+    if _picked:
+        import sys as _sys
+        print('\n'.join(_picked[-6000:]), file=_sys.stderr)
     raise SystemExit(result.stdout[-3500:])
 data = destination.read_bytes()
 magic, cpu, subtype, kind, count, size = struct.unpack_from('<6I', data)
