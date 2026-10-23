@@ -151,9 +151,16 @@ else:
     report.append('  MISS   row busy poll instead of waitForService')
 
 
-after('\t\tnabu_mark_num("B returned", (unsigned long)(service != NULL), 2500);',
-      COUNT_MEDIA,
-      'row iomedia enumeration')
+# The marker shares a line with the following if-statement, so anchor on the boundary itself:
+# after() appends a newline and therefore never matches.
+_BOUNDARY = '(unsigned long)(service != NULL), 2500);\t\tif ((!service)'
+if _BOUNDARY in text:
+    text = text.replace(_BOUNDARY,
+                        '(unsigned long)(service != NULL), 2500);\n' + COUNT_MEDIA + '\t\tif ((!service)',
+                        1)
+    report.append('  replace row iomedia enumeration')
+else:
+    report.append('  MISS   row iomedia enumeration')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(text)
 print('\n'.join(report))
