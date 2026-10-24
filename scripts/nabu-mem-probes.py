@@ -13,23 +13,24 @@ report = []
 
 if SRC.endswith('vm_resident.c'):
     DECL = '\n/* for the post-startup probe */\nextern void nabu_mark_text(const char *s, unsigned int y);\n'
-    ANCHOR = '\tpmap_startup(&virtual_space_start, &virtual_space_end);'
+    # A probe retired: it read 1,207,626, which is sane. Moving to the end of vm_page_bootstrap.
+    ANCHOR = '\tkernel_debug_string_early("vm_page_bootstrap complete");'
     INJECT = (
-        '\tpmap_startup(&virtual_space_start, &virtual_space_end);\n'
         '\t{\n'
         '\t\tchar __b[96];\n'
-        '\t\tsnprintf(__b, sizeof(__b), "A fp=%u pg=%u",\n'
-        '\t\t    vm_page_free_count, (unsigned int)atop_64(max_mem));\n'
+        '\t\tsnprintf(__b, sizeof(__b), "B fp=%u w=%u",\n'
+        '\t\t    vm_page_free_count, vm_page_wire_count);\n'
         '\t\tpanic ("%s", __b);\n'
-        '\t}'
+        '\t}\n'
+        '\tkernel_debug_string_early("vm_page_bootstrap complete");'
     )
-    if 'A fp=%u pg=%u' in src:
-        report.append('  skip   post-startup probe already present')
+    if 'B fp=%u w=%u' in src:
+        report.append('  skip   bootstrap-end probe already present')
     elif ANCHOR in src:
         src = src.replace(ANCHOR, INJECT, 1)
-        report.append('  insert post-startup probe')
+        report.append('  insert bootstrap-end probe')
     else:
-        report.append('  MISS   pmap_startup call anchor')
+        report.append('  MISS   bootstrap-end anchor')
     io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 
 elif SRC.endswith('pmap.c'):
