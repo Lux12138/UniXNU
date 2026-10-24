@@ -11,6 +11,7 @@ src = io.open(SRC, encoding='utf-8').read()
 report = []
 
 DECL = ('\n/* status-strip markers */\n'
+        '#include <pexpert/pexpert.h>\n'
         'extern void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n')
 if 'extern void nabu_mark_num' not in src:
     hdr = '#include <sys/proc.h>'
