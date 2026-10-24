@@ -26,10 +26,14 @@ INJECT = (
     '\t\t{\n'
     '\t\t\tint __amfi = 0;\n'
     '\t\t\tboolean_t __got = PE_parse_boot_argn("amfi_get_out_of_my_way", &__amfi, sizeof(__amfi));\n'
-    '\t\t\tnabu_mark_num ("AM", (unsigned long)(__got ? (unsigned long)__amfi : 999), 1500);\n'
-    '\t\t\tnabu_mark_num ("CS", (unsigned long)(proc_getcsflags(p) & CS_KILLED), 1580);\n'
-    '\t\t\tnabu_mark_num ("NS", signal_reason ? (unsigned long)signal_reason->osr_namespace : 888, 1660);\n'
-    '\t\t\tnabu_mark_num ("CD", signal_reason ? (unsigned long)signal_reason->osr_code : 777, 1740);\n'
+    '\t\t\t/* 2500/2580 are the last two rows clear of the console (which paints to 1780) and of the\n'
+    '\t\t\t   sleh probes at 1560..2420. Pack two values per row. */\n'
+    '\t\t\tnabu_mark_num ("AMx", (unsigned long)((__got ? (unsigned long)__amfi : 999) * 10\n'
+    '\t\t\t    + (proc_getcsflags(p) & CS_KILLED ? 1 : 0)), 2500);\n'
+    '\t\t\tnabu_mark_num ("NSc", signal_reason\n'
+    '\t\t\t    ? (unsigned long)(signal_reason->osr_namespace * 1000\n'
+    '\t\t\t        + (signal_reason->osr_code % 1000))\n'
+    '\t\t\t    : 777777, 2580);\n'
     '\t\t}'
 )
 
