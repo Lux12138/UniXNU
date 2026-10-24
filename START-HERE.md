@@ -1,20 +1,34 @@
 # START HERE — 本仓库是 nabu (小米平板5 / SM8150) 的内核 fork
 
-> 新会话接手必读。**不读就动手 = 重踩今天十个坑。**
+> 新会话接手必读。**不读全就动手 = 重踩今天十个坑。**
 
 ## 完整交接在另一个仓库
 
-**主交接文档在 `Lux12138/unixnu-nabu`**：`START-HERE.md` → `HANDOVER-2026-10-24-ROLLBACK.md`
-→ `HANDOVER-exec-fault.md`（689 行主线记录）。
+**主交接在 `Lux12138/unixnu-nabu`**，三份按顺序读：
 
-那边还放着 `PUSH-GOTCHA.md`（git push 假成功的坑）。
+1. `START-HERE.md` —— 铁律、基线、复现命令、坑速查
+2. **`DOCS-INDEX.md`** —— 云端全部 18 份文档的索引（每份讲什么、什么时候读）
+3. `HANDOVER-2026-10-24-ROLLBACK.md` → `HANDOVER-exec-fault.md`（689 行主线）
+
+那边还有 `PUSH-GOTCHA.md`（git push 假成功的坑）和 `STATUS.md`（40K 逐轮流水）。
+
+## 必须研读全部文档和全部提交记录
+
+```bash
+cd ~/src/unixnu-nabu && git log --oneline -60
+cd ~/src/UniXNU      && git log --oneline -60
+```
+
+**每条 commit message 都要看** —— 它们是当轮的实测结论，不是套话。
+例如 `5488c9e`（PAC 修复机制）、`bcedff4`（vm_page_free_count 是后果不是原因）、
+`6373972`（探针弯路的十个流程错误）、`5b095ac`（DWC3 为什么崩，已回滚）。
 
 ## 本仓库当前 HEAD
 
 **`aae83c4`** —— 纯探针版（reason creator 探针 RN=/RA=），**无 DWC3、无重启调用**。
 刷机后屏幕停在 `unexpected SIGKILL of launchd`，`ESR=2516582469`。
 
-## 本仓库的三条硬规矩
+## 本仓库的四条硬规矩
 
 1. **改 `scripts/*.py` 必须 commit + 验证远端**：
    ```bash
@@ -32,6 +46,9 @@
    新探针选 ≥80px 间距的空行，避开 <1780（console 带）。
    **"没显示"先查行冲突，不是"没执行"**。
 
+4. **验证判据要选"应当存在"的东西**：`count = 0` 恒真，不能当成功证据。
+   用 **md5 变化** + **应存在的字符串 count > 0**。
+
 ## 构建
 
 ```bash
@@ -46,6 +63,6 @@ bash /mnt/c/Temp/auto/build_pack_short.sh
 
 | 仓库 | 用途 |
 |---|---|
-| `Lux12138/unixnu-nabu` | 板级配置 + **全部交接文档** |
+| `Lux12138/unixnu-nabu` | 板级配置 + **全部交接文档（18 份）** |
 | `Lux12138/NativeDwc3` | USB 驱动（能编译链接，但**缺 GCC 时钟会崩**，别接回 board.toml） |
-| `Lux12138/xnu-linux-toolchain` | Linux 构建工具链 fork |
+| `Lux12138/xnu-linux-toolchain` | Linux 构建工具链 fork（含 `docs/NABU-18-PITFALLS.md`） |
