@@ -1803,6 +1803,12 @@ fi
     test -f "$UFS_ARCHIVE"
     KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$UFS_ARCHIVE"
     KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $UFS_ARCHIVE"
+  if [ -f "$ROOT/build/native-dwc3/libNativeDwc3.a" ]; then
+    DWC3_ARCHIVE=$ROOT/build/native-dwc3/libNativeDwc3.a
+    test -f "$DWC3_ARCHIVE"
+    KERNEL_EXTRA_ARCHIVES="$KERNEL_EXTRA_ARCHIVES -Wl,-force_load,$DWC3_ARCHIVE"
+    KERNEL_ARCHIVE_DEPENDENCIES="$KERNEL_ARCHIVE_DEPENDENCIES $DWC3_ARCHIVE"
+  fi
     # NativeUfsBlock derives from IOBlockStorageDevice, which lives in the IOStorageFamily kext.
     # In register-probe mode (XNU_NABU_UFS_REGISTER_PROBE=1) the class is not compiled at all, so
     # nothing here needs those symbols. Enabling the real block driver needs the verified-root
