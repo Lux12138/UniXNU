@@ -49,8 +49,8 @@ else:
 
 # paint the reason at the delivery point
 SIG2 = 'psignal_with_reason(p, SIGKILL, signature_failure_reason);'
-if 'nabu_mark_num ("SN"' in src:
-    report.append('  skip   SN present')
+if True:  # SN/SC/SU answered: 9 / 8 / 0. LU needs their rows.
+    report.append('  skip   SN retired (rows freed for LU/EM)')
 elif SIG2 in src:
     src = src.replace(SIG2,
         'nabu_mark_num ("SN", signature_failure_reason'
