@@ -33,24 +33,9 @@ if SRC.endswith('vm_resident.c'):
     io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 
 elif SRC.endswith('pmap.c'):
-    ANCHOR = 'avail_page_count = atop(end - first);'
-    INJECT = (
-        'avail_page_count = atop(end - first);\n'
-        '\t{\n'
-        '\t\tchar __b[96];\n'
-        '\t\tsnprintf(__b, sizeof(__b), "V2 fp=%u mm=%llu pg=%u",\n'
-        '\t\t    vm_page_free_count, (unsigned long long)(max_mem >> 20), avail_page_count);\n'
-        '\t\tpanic ("%s", __b);\n'
-        '\t}'
-    )
-    if 'V2 fp=%u' in src:
-        report.append('  skip   pmap probe already present')
-    elif ANCHOR in src:
-        src = src.replace(ANCHOR, INJECT, 1)
-        report.append('  insert pmap probe')
-    else:
-        report.append('  MISS   avail_page_count anchor')
-    io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
+    # pmap.c probe retired: it fires inside pmap_startup and blocks the post-startup probe.
+    # Its data is recorded -- fp=0 mm=4864 pg=122436.
+    report.append('  skip   pmap probe retired')
 else:
     report.append('  skip   unknown file')
 
