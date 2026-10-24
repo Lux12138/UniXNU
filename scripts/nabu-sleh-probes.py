@@ -42,6 +42,19 @@ elif FIX_OLD in src:
 else:
     report.append('  fix    MISS anchor')
 
+# paint the recovery jump target
+JT_ANCHOR = '\tthread->machine.recover_esr = esr;'
+if 'nabu_mark_num ("JT"' in src:
+    report.append('  skip   JT present')
+elif JT_ANCHOR in src:
+    src = src.replace(JT_ANCHOR,
+        '\tnabu_mark_num ("JT", (unsigned long)recover->cre_recovery, 2140);\n'
+        '\tnabu_mark_num ("RJ", (unsigned long)recover, 2220);\n'
+        + JT_ANCHOR, 1)
+    report.append('  insert JT/RJ')
+else:
+    report.append('  MISS   recover_esr anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 
 print('\n'.join(report))
