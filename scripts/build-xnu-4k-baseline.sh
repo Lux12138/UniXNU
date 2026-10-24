@@ -185,6 +185,9 @@ fi
 if [ -f "$ROOT/scripts/nabu-sig-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-sig-probes.py" .cache/xnu-work/bsd/kern/kern_sig.c | tail -3
 fi
+if [ -f "$ROOT/scripts/nabu-mac-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-mac-probes.py" .cache/xnu-work/security/mac_vfs.c | tail -3
+fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
   : # arm_init.c probe retired (row collisions)
 fi
