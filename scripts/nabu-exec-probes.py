@@ -8,9 +8,15 @@ src = io.open(SRC, encoding='utf-8').read()
 report = []
 
 # declare the helpers: kern_exec.c cannot see nabu_early_mark.h
-DECL = ('\n/* status-strip markers from nabu_early_mark.c */\n'
-        'extern void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n'
-        'extern void nabu_mark_text(const char *s, unsigned int y);\n')
+# kern_exec.c is C and cannot see nabu_early_mark.h, so it needs the externs. IOKitBSDInit.cpp is C++ and
+# already includes that header, where the same functions carry C linkage -- a second C++-linkage
+# declaration there is a hard error ("different language linkage"), so it gets nothing.
+if SRC.endswith('kern_exec.c'):
+    DECL = ('\n/* status-strip markers from nabu_early_mark.c */\n'
+            'extern void nabu_mark_num(const char *label, unsigned long v, unsigned int y);\n'
+            'extern void nabu_mark_text(const char *s, unsigned int y);\n')
+else:
+    DECL = ''
 if 'extern void nabu_mark_num' not in src:
     hdr = '#include <sys/imgact.h>'
     if hdr in src:
