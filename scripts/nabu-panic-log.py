@@ -181,9 +181,13 @@ nabu_psci_reset(void)
 
 DEBUG_HELPER = r'''
 /* nabu: panic restart ---------------------------------------------------------
- * Flush the console ring to UFS, then reset through PSCI SYSTEM_RESET. The reset
- * is direct because PE_halt_restart is NULL on this port: PEHaltRestart() only
- * returns -1 and halts in place. Boot arg nabu-panic-restart=0 disables it.
+ * Reset through PSCI SYSTEM_RESET. The reset is direct because PE_halt_restart
+ * is NULL on this port: PEHaltRestart() only returns -1 and halts in place.
+ * Boot arg nabu-panic-restart selects how much runs before the reset:
+ *   0  off
+ *   1  reset only (default; proves the SMC path without touching UFS)
+ *   2  flush the console ring to the UFS log window, then reset
+ * Every step paints a marker, so a screen that stops moving says which one hung.
  */
 extern int nabu_log_flush(int is_panic);
 extern void nabu_psci_reset(void);
@@ -192,14 +196,21 @@ extern void nabu_mark_text(const char *s, unsigned int y);
 static void
 nabu_panic_restart(void)
 {
-	int enabled = 1;
-	PE_parse_boot_argn("nabu-panic-restart", &enabled, sizeof(enabled));
-	if (!enabled) {
+	int mode = 1;
+	PE_parse_boot_argn("nabu-panic-restart", &mode, sizeof(mode));
+	if (mode == 0) {
+		nabu_mark_text("nabu:panic-off", 2500);
 		return;
 	}
-	nabu_log_flush(1);
+	nabu_mark_text("nabu:panic", 2500);
+	if (mode >= 2) {
+		nabu_mark_text("nabu:flush", 2500);
+		nabu_log_flush(1);
+		nabu_mark_text("nabu:flushed", 2500);
+	}
 	nabu_mark_text("nabu:reset", 2420);
 	nabu_psci_reset();
+	nabu_mark_text("nabu:reset-failed", 2500);
 }
 /* ---- end nabu panic restart ------------------------------------------------ */
 '''
@@ -227,8 +238,18 @@ def patch_console(path):
 def patch_debug(path):
     src = read(path)
     report = []
-    if 'nabu: panic restart' in src:
+    if 'nabu:reset-failed' in src:
         return ['  skip   debug.c: hook present']
+    if '/* nabu: panic restart' in src:
+        # Upgrade a hook written before the flush became optional: the call sites are
+        # unchanged, only the helper body moves.
+        start = src.find('/* nabu: panic restart')
+        end = src.find('/* ---- end nabu panic restart', start)
+        if end < 0:
+            return ['  MISS   debug.c: unterminated helper block']
+        end = src.find('\n', end) + 1
+        write(path, src[:start] + DEBUG_HELPER.strip() + '\n' + src[end:])
+        return ['  replace debug.c: helper upgraded to the staged reset']
 
     helper_anchor = 'void\npanic_spin_forever(void)\n{\n'
     if helper_anchor not in src:
