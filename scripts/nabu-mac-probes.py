@@ -21,7 +21,7 @@ if 'extern void nabu_mark_num' not in src:
     report.append('  insert declaration')
 
 ANCHOR = '\t*labelupdateerror = error;'
-INJECT = ('\tnabu_mark_num ("LU", (unsigned long)(unsigned int)error, 2100);\n' + ANCHOR)
+INJECT = ('\tnabu_mark_num ("LU", (unsigned long)(unsigned int)error, 2500);\n' + ANCHOR)
 
 if 'nabu_mark_num ("LU"' in src:
     report.append('  skip   LU present')
