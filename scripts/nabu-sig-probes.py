@@ -48,19 +48,20 @@ else:
     report.append('  MISS   initproc guard anchor')
 
 # paint the reason at the delivery point
-PS_ANCHOR = 'psignal_with_reason(current_proc(), SIGKILL, exec_failure_reason);'
-if 'nabu_mark_num ("PN"' in src:
-    report.append('  skip   PN present')
-elif PS_ANCHOR in src:
-    src = src.replace(PS_ANCHOR,
-        'nabu_mark_num ("PN", exec_failure_reason'
-        ' ? (unsigned long)exec_failure_reason->osr_namespace : 7777, 2100);\n'
-        '\t\t\tnabu_mark_num ("PC2", exec_failure_reason'
-        ' ? (unsigned long)exec_failure_reason->osr_code : 7777, 2180);\n'
-        '\t\t\t' + PS_ANCHOR, 1)
-    report.append('  insert PN/PC2 at the exec SIGKILL')
+SIG2 = 'psignal_with_reason(p, SIGKILL, signature_failure_reason);'
+if 'nabu_mark_num ("SN"' in src:
+    report.append('  skip   SN present')
+elif SIG2 in src:
+    src = src.replace(SIG2,
+        'nabu_mark_num ("SN", signature_failure_reason'
+        ' ? (unsigned long)signature_failure_reason->osr_namespace : 7777, 2100);\n'
+        '\t\t\tnabu_mark_num ("SC", signature_failure_reason'
+        ' ? (unsigned long)signature_failure_reason->osr_code : 7777, 2180);\n'
+        '\t\t\tnabu_mark_num ("SU", (unsigned long)require_success, 2260);\n'
+        '\t\t\t' + SIG2, 1)
+    report.append('  insert SN/SC/SU at the signature SIGKILL')
 else:
-    report.append('  MISS   exec SIGKILL anchor')
+    report.append('  MISS   signature SIGKILL anchor')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
