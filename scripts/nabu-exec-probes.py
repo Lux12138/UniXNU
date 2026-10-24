@@ -150,7 +150,9 @@ for anchor, label, row in ((DLF, 'dlf', 2420), (DLM, 'dlm', 2500), (MBF, 'mbf', 
 
 # free page count at exec time: does page-in have anything to give?
 FREEPG = 'nabu_mark_num ("aas", 1, 2020);'
-if 'nabu_mark_num ("freepg"' in src:
+if True:  # freepg/wirepg retired: rows 2420/2500 go to the bisect probes
+    report.append('  skip   freepg retired')
+elif 'nabu_mark_num ("freepg"' in src:
     report.append('  skip   freepg already present')
 elif FREEPG in src:
     decl = ('\n/* vm page counters, for the page-in failure hypothesis */\n'
@@ -227,7 +229,7 @@ elif C_ANCHOR in src:
     src = src.replace(C_ANCHOR,
         '{\n'
         '\t\textern unsigned int vm_page_free_count;\n'
-        '\t\tnabu_mark_num ("P3", vm_page_free_count, 2020);\n'
+        '\t\tnabu_mark_num ("P3", vm_page_free_count, 2340);\n'
         '\t}\n'
         + C_ANCHOR, 1)
     report.append('  insert P3 (painted) at IOFindBSDRoot')
@@ -242,7 +244,7 @@ if 'nabu_mark_num ("Q4"' in src:
 elif Q4 in src:
     src = src.replace(Q4,
         '\t\tnabu_mark_num ("Q4",'
-        ' (unsigned long)(current_map() == kernel_map), 2100);\n'
+        ' (unsigned long)(current_map() == kernel_map), 2420);\n'
         + Q4, 1)
     report.append('  insert Q4 at 2100')
 else:

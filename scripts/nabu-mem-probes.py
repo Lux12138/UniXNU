@@ -37,7 +37,7 @@ if SRC.endswith('vm_resident.c'):
 
     A1 = '\tpmap_startup(&virtual_space_start, &virtual_space_end);'
     I1 = ('\tpmap_startup(&virtual_space_start, &virtual_space_end);\n'
-          '\tnabu_mark_num ("P1", vm_page_free_count, 1860);')
+          '\tnabu_mark_num ("P1", vm_page_free_count, 2180);')
     if 'nabu_mark_num ("P1"' in src:
         report.append('  skip   P1 present')
     elif A1 in src:
@@ -47,7 +47,7 @@ if SRC.endswith('vm_resident.c'):
         report.append('  MISS   P1 anchor')
 
     A2 = '\tkernel_debug_string_early("vm_page_bootstrap complete");'
-    I2 = ('\tnabu_mark_num ("P2", vm_page_free_count, 1940);\n' + A2)
+    I2 = ('\tnabu_mark_num ("P2", vm_page_free_count, 2260);\n' + A2)
     if 'nabu_mark_num ("P2"' in src:
         report.append('  skip   P2 present')
     elif A2 in src:
@@ -70,7 +70,7 @@ elif SRC.endswith('pmap.c'):
         report.append('  insert declaration')
 
     A0 = 'avail_page_count = atop(end - first);'
-    I0 = (A0 + '\n\tnabu_mark_num ("P0", avail_page_count, 1780);')
+    I0 = (A0 + '\n\tnabu_mark_num ("P0", avail_page_count, 2100);')
     if 'nabu_mark_num ("P0"' in src:
         report.append('  skip   P0 present')
     elif A0 in src:
