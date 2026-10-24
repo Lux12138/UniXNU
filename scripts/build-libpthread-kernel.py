@@ -116,6 +116,12 @@ elif missing:
     raise SystemExit(f'Unavailable real kernel imports: {missing}')
 archive = OUT / 'libpthread_kernel.a'
 archive.unlink(missing_ok=True)
-compile_one(ROOT / '.cache/xnu-work/bsd/kern/source_pthread_bootstrap.c', OUT / 'source_pthread_bootstrap.o')
+# The kernel image this board already links carries _pthread_start from an earlier
+# bootstrap, so from the next build on the symbol set reports it as a collision and
+# the three C sources get renamed. The bootstrap has to be compiled the same way or
+# it keeps calling the old name and the link fails.
+compile_one(ROOT / '.cache/xnu-work/bsd/kern/source_pthread_bootstrap.c',
+            OUT / 'source_pthread_bootstrap.o',
+            namespace if collisions else None)
 subprocess.run(['xcrun', 'ar', 'rcs', archive, *objects, OUT / 'source_pthread_bootstrap.o'], check=True)
 print('Matching libpthread: 3 real C sources + bootstrap, ARM64/iOS 17 audit, no unavailable kernel names')

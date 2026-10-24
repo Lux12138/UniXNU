@@ -31,7 +31,10 @@ def write(path, text):
     io.open(path, 'w', encoding='utf-8', newline='').write(text)
 
 
+LOG_VERSION = 6
+
 LOG_BLOCK = r'''
+/* nabu-log-version: 6 */
 /* ---- nabu: panic log capture -------------------------------------------------
  * Every character that reaches the console is mirrored into a ring. On panic the
  * ring and a header are written to the diagnostic log window at the end of the
@@ -59,6 +62,7 @@ static unsigned long long nabu_log_total;
 static unsigned int nabu_log_dropped;
 static int nabu_log_opened;
 static int nabu_log_flushed;
+static int nabu_log_hold;
 
 extern void nabu_mark_text(const char *s, unsigned int y);
 extern int native_ufs_log_open(uint64_t *first_lba, uint64_t *blocks, const char **why);
@@ -97,7 +101,87 @@ static int
 nabu_log_fail(const char *why)
 {
 	nabu_mark_text(why, 2340);
+	/* Push whatever already landed (at minimum the header block) to the medium,
+	 * so the host can tell an open failure from a data-write failure. */
+	native_ufs_log_sync();
 	return 0;
+}
+
+/* Panic-time transport: DRAM above the kernel's maxmem, not UFS. The flush path
+ * takes the UFS host lock, and on hardware 2026-10-24 that never returned once the
+ * other CPUs were halted -- the board sat there instead of resetting. This window
+ * is mapped once at boot (nabu_panic_save_init) and the kernel never allocates it,
+ * so the copy is a plain memcpy. The next boot reads it back and writes it out. */
+static char *nabu_save_dram;
+static unsigned long long nabu_save_bytes;
+static int nabu_log_restored;
+
+void
+nabu_panic_save_init(void *dram, unsigned long long bytes)
+{
+	nabu_save_dram = (char *)dram;
+	nabu_save_bytes = bytes;
+}
+
+static unsigned int
+nabu_log_read32(const char *at)
+{
+	return (unsigned int)(unsigned char)at[0] |
+	    ((unsigned int)(unsigned char)at[1] << 8) |
+	    ((unsigned int)(unsigned char)at[2] << 16) |
+	    ((unsigned int)(unsigned char)at[3] << 24);
+}
+
+static int
+nabu_save_has_space(void)
+{
+	return nabu_save_dram != 0 && nabu_save_bytes >= 4096ull + NABU_LOG_RING_BYTES;
+}
+
+static int
+nabu_save_has_magic(void)
+{
+	return nabu_save_has_space() &&
+	    nabu_save_dram[0] == 'N' && nabu_save_dram[1] == 'A' && nabu_save_dram[2] == 'B' &&
+	    nabu_save_dram[3] == 'U' && nabu_save_dram[4] == 'S' && nabu_save_dram[5] == 'A' &&
+	    nabu_save_dram[6] == 'V' && nabu_save_dram[7] == '1';
+}
+
+void
+nabu_panic_save(void)
+{
+	unsigned int i;
+
+	if (!nabu_save_has_space()) {
+		return;
+	}
+	nabu_save_dram[0] = 'N'; nabu_save_dram[1] = 'A'; nabu_save_dram[2] = 'B'; nabu_save_dram[3] = 'U';
+	nabu_save_dram[4] = 'S'; nabu_save_dram[5] = 'A'; nabu_save_dram[6] = 'V'; nabu_save_dram[7] = '1';
+	nabu_log_write64(nabu_save_dram + 8, nabu_log_total);
+	nabu_log_write32(nabu_save_dram + 16, nabu_log_head);
+	nabu_log_write32(nabu_save_dram + 20, nabu_log_dropped);
+	for (i = 0; i < NABU_LOG_RING_BYTES; ++i) {
+		nabu_save_dram[4096 + i] = nabu_log_ring[i];
+	}
+}
+
+void
+nabu_panic_restore(void)
+{
+	unsigned int i;
+
+	if (!nabu_save_has_magic()) {
+		return;
+	}
+	nabu_log_total = (unsigned long long)nabu_log_read32(nabu_save_dram + 8) |
+	    ((unsigned long long)nabu_log_read32(nabu_save_dram + 12) << 32);
+	nabu_log_head = nabu_log_read32(nabu_save_dram + 16);
+	nabu_log_dropped = nabu_log_read32(nabu_save_dram + 20);
+	for (i = 0; i < NABU_LOG_RING_BYTES; ++i) {
+		nabu_log_ring[i] = nabu_save_dram[4096 + i];
+	}
+	nabu_log_restored = 1;
+	nabu_save_dram[0] = 0;
 }
 
 int
@@ -109,12 +193,12 @@ nabu_log_flush(int is_panic)
 	unsigned long long available;
 	unsigned int offset, length, blocks, i;
 
-	if (nabu_log_flushed && !is_panic) {
-		return 1;
-	}
 	if (!nabu_log_opened) {
 		if (!native_ufs_log_open(&first, &window, &why)) {
-			return nabu_log_fail("nabu:log-nowin");
+			/* why names the refusal ("off", "no root layout", "window refused", ...). */
+			nabu_log_fail(why);
+			nabu_mark_text("nabu:log-nowin", 2300);
+			return 0;
 		}
 		nabu_log_opened = 1;
 	}
@@ -139,6 +223,9 @@ nabu_log_flush(int is_panic)
 	if (!native_ufs_log_write(0, 1, nabu_log_block)) {
 		return nabu_log_fail("nabu:log-fail");
 	}
+	/* Land the header before the bulk copy: if the data path fails or the reset
+	 * arrives early, the window still carries NABULOG1 and the open succeeded. */
+	(void)native_ufs_log_sync();
 
 	offset = (unsigned int)((nabu_log_head + NABU_LOG_RING_BYTES - available) & NABU_LOG_RING_MASK);
 	rel = 1;
@@ -162,6 +249,37 @@ nabu_log_flush(int is_panic)
 	nabu_log_flushed = 1;
 	nabu_mark_text("nabu:log-written", 2340);
 	return 1;
+}
+
+/* Called by the UFS driver once the root windows are published. Opening and writing
+ * here, in ordinary process context, proves the window and the write path and puts
+ * the boot half of the ring on the medium even if the panic path cannot write. */
+void
+nabu_log_boot_probe(void)
+{
+	nabu_mark_text("nabu:probe", 2200);
+	/* If the last reset came from panic(), its tail is still in the reserved DRAM
+	 * window. Put it in the ring first so this boot persists that, not its own. */
+	nabu_panic_restore();
+	(void)nabu_log_flush(nabu_log_restored ? 1 : 0);
+	if (nabu_log_restored) {
+		nabu_log_hold = 1;
+		nabu_log_restored = 0;
+	}
+}
+
+/* Rewrite the window from a healthy kernel thread. panic() itself must not touch
+ * UFS: on hardware 2026-10-24 the flush there took the host lock and never returned,
+ * so the board never reset. The periodic copy is at most one interval stale.
+ * hold is set when the window was just filled with the previous panic's tail; the
+ * next boot must not overwrite it from this boot's (uninteresting) ring. */
+void
+nabu_log_periodic(void)
+{
+	if (nabu_log_hold || !nabu_log_opened) {
+		return;
+	}
+	(void)nabu_log_flush(0);
 }
 
 void
@@ -190,13 +308,17 @@ DEBUG_HELPER = r'''
  * Every step paints a marker, so a screen that stops moving says which one hung.
  */
 extern int nabu_log_flush(int is_panic);
+extern void nabu_panic_save(void);
 extern void nabu_psci_reset(void);
 extern void nabu_mark_text(const char *s, unsigned int y);
 
 static void
 nabu_panic_restart(void)
 {
-	int mode = 1;
+	/* nabu:saved -- panic only copies the ring to the reserved DRAM window and
+	 * resets. It must not touch UFS: the flush there held the host lock and the
+	 * board never reset on hardware 2026-10-24. The next boot persists the copy. */
+	int mode = 2;
 	PE_parse_boot_argn("nabu-panic-restart", &mode, sizeof(mode));
 	if (mode == 0) {
 		nabu_mark_text("nabu:panic-off", 2500);
@@ -204,9 +326,9 @@ nabu_panic_restart(void)
 	}
 	nabu_mark_text("nabu:panic", 2500);
 	if (mode >= 2) {
-		nabu_mark_text("nabu:flush", 2500);
-		nabu_log_flush(1);
-		nabu_mark_text("nabu:flushed", 2500);
+		nabu_mark_text("nabu:save", 2500);
+		nabu_panic_save();
+		nabu_mark_text("nabu:saved", 2500);
 	}
 	nabu_mark_text("nabu:reset", 2420);
 	nabu_psci_reset();
@@ -219,8 +341,19 @@ nabu_panic_restart(void)
 def patch_console(path):
     src = read(path)
     report = []
+    marker = '/* nabu-log-version: %d */' % LOG_VERSION
+    if marker in src:
+        return ['  skip   serial_general.c: log block v%d present' % LOG_VERSION]
     if 'nabu: panic log capture' in src:
-        return ['  skip   serial_general.c: hook present']
+        # A tree patched with an older block. The hook point is unchanged; replace
+        # the whole block so new helpers and fixes actually reach the kernel.
+        start = src.find('/* ---- nabu: panic log capture')
+        end = src.find('/* ---- end nabu panic log', start)
+        if start < 0 or end < 0:
+            return ['  MISS   serial_general.c: unterminated log block']
+        end = src.find('\n', end) + 1
+        write(path, src[:start] + LOG_BLOCK.strip() + '\n' + src[end:])
+        return ['  update serial_general.c: log block to v%d' % LOG_VERSION]
     anchor = 'void\nconsole_printbuf_putc(int ch, void * arg)\n{\n'
     if anchor not in src:
         return ['  MISS   serial_general.c: console_printbuf_putc anchor']
@@ -238,7 +371,7 @@ def patch_console(path):
 def patch_debug(path):
     src = read(path)
     report = []
-    if 'nabu:reset-failed' in src:
+    if 'nabu:saved' in src:
         return ['  skip   debug.c: hook present']
     if '/* nabu: panic restart' in src:
         # Upgrade a hook written before the flush became optional: the call sites are

@@ -433,6 +433,11 @@ static void nabu_uart_putc(char c)
 void nabu_mark_putc(char c)
 {
   unsigned int scale = 3, cw = 6 * 3, ch = 8 * 3;
+  /* Every kprintf character ends here once PE_init_kprintf has run, which is where
+   * the panic ring has to capture from: console_printbuf_putc only sees the early
+   * output before that sink is installed (hardware 2026-10-24, the ring stopped at
+   * 53 KiB). nabu_log_putc is a plain byte copy and safe at any stage. */
+  { extern void nabu_log_putc(int); nabu_log_putc((int)(unsigned char)c); }
   nabu_uart_putc(c);
   if (g_fb == NULL) { return; }
   if (!g_tx_init) { g_tx = 16; g_ty = 16; g_tx_init = 1; }
@@ -807,14 +812,16 @@ for _old, _new in (
 io.open(kop,'w',encoding='utf-8',newline='').write(ko)
 
 # Exception-vector hold. Every synchronous exception enters sleh_synchronous_sp1 with
-# esr/far already decoded by hardware. A kernel abort gets its trap data painted and then
-# spins, so the panel keeps the crime scene instead of losing it on reboot. Only abort
-# classes are trapped; SVC/BRK/MSR traps must keep flowing.
+# esr/far already decoded by hardware. A kernel abort gets its trap data painted, then
+# falls through to the normal abort handler: that ends in panic(), whose diagnostics
+# hook resets the board. It must not spin here -- an endless loop on the vector would
+# also stop the automatic reset. Only abort classes are touched; SVC/BRK/MSR traps
+# must keep flowing.
 slc=sys.argv[6]
 sl=io.open(slc,encoding='utf-8').read()
 if 'nabu_abort_hold' not in sl:
     sl=add_include(sl, '#include <pexpert/pexpert.h>')
-    _hold = ('\t/* nabu_abort_hold: kernel abort -> paint EC/FAR and stop here. */\n'
+    _hold = ('\t/* nabu_abort_hold: kernel abort -> paint EC/FAR, then return to the handler. */\n'
              '\t{\n'
              '\t\tuint32_t _ec = (esr >> 26) & 0x3F;\n'
              '\t\tif (_ec == 0x24 || _ec == 0x25 || _ec == 0x20 || _ec == 0x21) {\n'
@@ -822,7 +829,6 @@ if 'nabu_abort_hold' not in sl:
              '\t\t\t    (int)((far >> 12) & 0xFF),\n'
              '\t\t\t    (int)((far >> 20) & 0xFF),\n'
              '\t\t\t    (int)((far >> 28) & 0xFF));\n'
-             '\t\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
              '\t\t}\n'
              '\t}\n')
     # handle_kernel_abort() already holds the decoded esr and the faulting address far.
@@ -840,6 +846,14 @@ if 'nabu_abort_hold' not in sl:
     sl = ins_body_start(sl, r'^sleh_synchronous_sp1\(arm_context_t \*context, uint32_t esr, vm_offset_t far __unused\)\n\{\n',
                         [_hold], 'sleh abort hold')
     io.open(slc,'w',encoding='utf-8',newline='').write(sl)
+else:
+    # A tree patched by an older build still carries the endless loop at the vector.
+    # Remove it: the panic path now reboots on its own, and a loop here would win.
+    _old_hold = '\t\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
+    if _old_hold in sl:
+        sl = sl.replace(_old_hold, '', 1)
+        io.open(slc,'w',encoding='utf-8',newline='').write(sl)
+        print('  update sleh.c: abort hold no longer spins')
 
 # panic() hold. An abort would have been caught at the vector, so if the panel froze
 # without EC/FAR the boot died in panic() instead -- and panic() needs the console that
@@ -906,10 +920,67 @@ if 'nabu_panic_hold' not in db:
            '\t\t  nabu_mark_num("kobjcnt=", (unsigned long)(unsigned)mach_kobj_count, 1440); }\n'
            '\t\t\tva_end(_ap);\n'
            '\t\t}\n'
-           '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n'
+           '\t\t{ int _h = 0;\n'
+           '\t\t  PE_parse_boot_argn("nabu-panic-hold", &_h, sizeof(_h));\n'
+           '\t\t  if (_h) { for (;;) { __asm__ __volatile__("nop"); } } }\n'
            '\t}\n')
     db = ins_body_start(db, r'^panic\(const char \*str, \.\.\.\)\n\{\n', [_ph], 'panic hold')
     io.open(dbc,'w',encoding='utf-8',newline='').write(db)
+
+# A tree patched by an older build still stops every panic in an endless loop, which
+# also stops the reset: panic() never returns to panic_trap_to_debugger(). Turn that
+# stop into an opt-in (nabu-panic-hold=1); by default the panic continues.
+_old_panic_hold = '\t\tfor (;;) { __asm__ __volatile__("nop"); }\n\t}\n'
+_new_panic_hold = ('\t\t{ int _h = 0;\n'
+                   '\t\t  PE_parse_boot_argn("nabu-panic-hold", &_h, sizeof(_h));\n'
+                   '\t\t  if (_h) { for (;;) { __asm__ __volatile__("nop"); } } }\n'
+                   '\t}\n')
+if _old_panic_hold in db:
+    db = db.replace(_old_panic_hold, _new_panic_hold, 1)
+    io.open(dbc,'w',encoding='utf-8',newline='').write(db)
+    print('  update debug.c: panic hold is opt-in (nabu-panic-hold=1)')
+
+# Reset from the panic path. panic_spin_forever() and kdp_machine_reboot_type() are
+# downstream of paths this port compiles out or that PEHaltRestart() cannot take
+# (PE_halt_restart is NULL). debugger_collect_diagnostics() always runs on the panic
+# path and has already saved the paniclog when it reaches this branch, so reset here:
+# the coredump/KDP tail below has no backend on this board anyway.
+if 'nabu:diagnostics-reset' not in db:
+    _diag_anchor = ('\tif (debugger_current_op == DBOP_PANIC ||\n'
+                    '\t    ((debugger_current_op == DBOP_DEBUGGER) && debugger_is_panic)) {\n'
+                    '\t\tPEHaltRestart(kPEPanicDiagnosticsDone);\n'
+                    '\t}\n')
+    if _diag_anchor in db:
+        db = db.replace(_diag_anchor,
+                        '\tif (debugger_current_op == DBOP_PANIC ||\n'
+                        '\t    ((debugger_current_op == DBOP_DEBUGGER) && debugger_is_panic)) {\n'
+                        '\t\t/* nabu:diagnostics-reset: paniclog is saved; reset before\n'
+                        '\t\t * PEHaltRestart(), whose backend is NULL on this port, and\n'
+                        '\t\t * before the coredump/KDP tail, which it cannot service. */\n'
+                        '\t\tnabu_panic_restart();\n'
+                        '\t\tPEHaltRestart(kPEPanicDiagnosticsDone);\n'
+                        '\t}\n', 1)
+        io.open(dbc,'w',encoding='utf-8',newline='').write(db)
+        print('  insert debug.c: reset after paniclog diagnostics')
+    else:
+        print('  MISS   debug.c: panic diagnostics anchor')
+else:
+    # A tree patched a moment ago carries the reset after PEHaltRestart(). That call
+    # reaches gIOPlatform->haltRestart() first; it has no backend here and may take
+    # the platform panic actions with it, so the reset has to come first.
+    _late = ('\t\tPEHaltRestart(kPEPanicDiagnosticsDone);\n'
+             '\t\t/* nabu:diagnostics-reset: paniclog is saved; reset before the\n'
+             '\t\t * coredump/KDP tail, which this port cannot service. */\n'
+             '\t\tnabu_panic_restart();\n')
+    _early = ('\t\t/* nabu:diagnostics-reset: paniclog is saved; reset before\n'
+              '\t\t * PEHaltRestart(), whose backend is NULL on this port, and\n'
+              '\t\t * before the coredump/KDP tail, which it cannot service. */\n'
+              '\t\tnabu_panic_restart();\n'
+              '\t\tPEHaltRestart(kPEPanicDiagnosticsDone);\n')
+    if _late in db:
+        db = db.replace(_late, _early, 1)
+        io.open(dbc,'w',encoding='utf-8',newline='').write(db)
+        print('  update debug.c: reset moved ahead of PEHaltRestart')
 
 # The panel proved the panic is "Invalid ticket lock", i.e. lck_ticket_verify() found a
 # lock whose type field is not LCK_TYPE_TICKET -- a lock that was never initialised.
