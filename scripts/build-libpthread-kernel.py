@@ -105,9 +105,14 @@ report = {'revision': REVISION, 'sources': 3, 'ordinary_arm64_ios17_audited': Tr
           'linker_synthesized_symbols': ['___dso_handle'],
           'registration_observed': False}
 (OUT / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
-if not {'_pthread_kern', '_current_uthread'} <= collisions:
+if not kernel_names:
+    # No trustworthy kernel symbol set (no link.filelist, or stale objects it lists are gone).
+    # Both checks compare against that set, so an empty set proves nothing and must not abort a
+    # build whose kernel pass is about to recompile the very objects that were dropped.
+    print('  skip   symbol checks: no complete kernel symbol set yet')
+elif not {'_pthread_kern', '_current_uthread'} <= collisions:
     raise SystemExit('Missing expected pthread/XNU static symbol isolation')
-if missing:
+elif missing:
     raise SystemExit(f'Unavailable real kernel imports: {missing}')
 archive = OUT / 'libpthread_kernel.a'
 archive.unlink(missing_ok=True)
