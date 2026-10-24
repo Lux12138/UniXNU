@@ -33,8 +33,8 @@ else:
 # misses every table entry and recover stays NULL. Wrap it the same way the rest of sleh.c
 # treats this value.
 FIX_OLD = '\tptrdiff_t offset = copyio_recovery_offset(get_saved_state_pc(state));'
-FIX_NEW = '\tptrdiff_t offset = copyio_recovery_offset(VM_KERNEL_UNSLIDE(get_saved_state_pc(state)));'
-if 'VM_KERNEL_UNSLIDE(get_saved_state_pc(state)));' in src and 'copyio_recovery_offset(VM_KERNEL_UNSLIDE' in src:
+FIX_NEW = '\tptrdiff_t offset = copyio_recovery_offset(VM_KERNEL_STRIP_PTR(get_saved_state_pc(state)));'
+if 'VM_KERNEL_STRIP_PTR(get_saved_state_pc(state)));' in src and 'copyio_recovery_offset(VM_KERNEL_STRIP_PTR' in src:
     report.append('  fix    already applied')
 elif FIX_OLD in src:
     src = src.replace(FIX_OLD, FIX_NEW, 1)
