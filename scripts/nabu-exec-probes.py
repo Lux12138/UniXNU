@@ -212,5 +212,25 @@ elif APTEST in src:
 else:
     report.append('  MISS   adjuserstack anchor')
 
+
+# Third bisect point: free page count at IOFindBSDRoot entry.
+C_ANCHOR = 'nabu_mark_text ("IOFindBSDRoot entered", 2420);'
+if 'C fp=' in s:
+    pass
+if 'C fp=' in src:
+    report.append('  skip   C probe already present')
+elif C_ANCHOR in src:
+    src = src.replace(C_ANCHOR,
+        '{\n'
+        '\t\tchar __c[96];\n'
+        '\t\textern unsigned int vm_page_free_count;\n'
+        '\t\tsnprintf(__c, sizeof(__c), "C fp=%u", vm_page_free_count);\n'
+        '\t\tpanic ("%s", __c);\n'
+        '\t}\n'
+        + C_ANCHOR, 1)
+    report.append('  insert C probe at IOFindBSDRoot')
+else:
+    report.append('  MISS   IOFindBSDRoot anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))

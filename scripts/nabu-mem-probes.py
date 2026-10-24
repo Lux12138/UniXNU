@@ -24,7 +24,9 @@ if SRC.endswith('vm_resident.c'):
         '\t}\n'
         '\tkernel_debug_string_early("vm_page_bootstrap complete");'
     )
-    if 'B fp=%u w=%u' in src:
+    if True:  # B probe retired after reading 1,207,621 / wire 37,563
+        pass
+    elif False:
         report.append('  skip   bootstrap-end probe already present')
     elif ANCHOR in src:
         src = src.replace(ANCHOR, INJECT, 1)
