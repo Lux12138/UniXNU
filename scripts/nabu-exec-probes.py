@@ -234,5 +234,19 @@ elif C_ANCHOR in src:
 else:
     report.append('  MISS   IOFindBSDRoot anchor')
 
+
+# Q4: is the thread still on the kernel map when the stack gets written?
+Q4 = '\t\tap = p->user_stack;'
+if 'nabu_mark_num ("Q4"' in src:
+    report.append('  skip   Q4 present')
+elif Q4 in src:
+    src = src.replace(Q4,
+        '\t\tnabu_mark_num ("Q4",'
+        ' (unsigned long)(current_thread()->map->pmap == kernel_pmap), 2100);\n'
+        + Q4, 1)
+    report.append('  insert Q4 at 2100')
+else:
+    report.append('  MISS   Q4 anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
