@@ -173,38 +173,14 @@ fi
 if [ -f "$ROOT/scripts/nabu-status-rows.py" ]; then
   python3 "$ROOT/scripts/nabu-status-rows.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
 fi
-if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -4
-fi
-if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
-fi
-if [ -f "$ROOT/scripts/nabu-sleh-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-sleh-probes.py" .cache/xnu-work/osfmk/arm64/sleh.c | tail -3
-fi
-if [ -f "$ROOT/scripts/nabu-sig-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-sig-probes.py" .cache/xnu-work/bsd/kern/kern_sig.c | tail -3
-fi
-if [ -f "$ROOT/scripts/nabu-sig-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-sig-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -3
-fi
-if [ -f "$ROOT/scripts/nabu-sig2-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-sig2-probes.py" .cache/xnu-work/bsd/kern/kern_sig.c | tail -3
-fi
-if [ -f "$ROOT/scripts/nabu-mac-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-mac-probes.py" .cache/xnu-work/security/mac_vfs.c | tail -3
-fi
-if [ -f "$ROOT/scripts/nabu-mac2-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-mac2-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -3
+if [ -f "$ROOT/scripts/nabu-reason-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-reason-probes.py" .cache/xnu-work/bsd/kern/sys_reason.c | tail -3
 fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
-  : # arm_init.c probe retired (row collisions)
+  : python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/pmap/pmap.c | tail -4
 fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/pmap/pmap.c | tail -4
-fi
-if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
-  python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/vm/vm_resident.c | tail -4
+  : python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/vm/vm_resident.c | tail -4
 fi
 
 # Count IOMedia instances right before the root lookup, and bound the untimed IODTNVRAM wait on the
