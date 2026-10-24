@@ -242,7 +242,7 @@ if 'nabu_mark_num ("Q4"' in src:
 elif Q4 in src:
     src = src.replace(Q4,
         '\t\tnabu_mark_num ("Q4",'
-        ' (unsigned long)(vm_map_pmap(current_map()) == kernel_pmap), 2100);\n'
+        ' (unsigned long)(current_map() == kernel_map), 2100);\n'
         + Q4, 1)
     report.append('  insert Q4 at 2100')
 else:
