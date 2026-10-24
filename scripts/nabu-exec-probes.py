@@ -214,9 +214,7 @@ else:
 
 
 # Third bisect point: free page count at IOFindBSDRoot entry.
-C_ANCHOR = 'nabu_mark_text ("IOFindBSDRoot entered", 2420);'
-if 'C fp=' in s:
-    pass
+C_ANCHOR = 'nabu_mark_text("IOFindBSDRoot entered", 2420);'
 if 'C fp=' in src:
     report.append('  skip   C probe already present')
 elif C_ANCHOR in src:
