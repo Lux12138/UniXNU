@@ -176,6 +176,9 @@ fi
 if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/bsd/kern/kern_exec.c | tail -4
 fi
+if [ -f "$ROOT/scripts/nabu-exec-probes.py" ]; then
+  python3 "$ROOT/scripts/nabu-exec-probes.py" .cache/xnu-work/iokit/bsddev/IOKitBSDInit.cpp | tail -4
+fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
   : # arm_init.c probe retired (row collisions)
 fi
