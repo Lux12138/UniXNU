@@ -1,51 +1,57 @@
 #!/usr/bin/env python3
-"""Extend the working RANGE panic in pmap.c with max_mem and vm_page_free_count.
+"""Read vm_page_free_count right after pmap_startup.
 
-The RANGE panic built and printed; the vm_resident one could not be made to recompile. So stay in pmap.c
-and add the two values that decide whether freepg's 91 million is even related to this code path.
-
-    end - first         = 4.67 GiB   (measured, matches owned_memory_size)
-    avail_page_count    =   122,436  (measured, 10x below (end-first)/4096)
-    max_mem             = ?          (expected 4864 MiB)
-    vm_page_free_count  = ?          (expected <= 122,436; freepg reported 91,199,441)
+pmap.c already shows fp=0 at initialize_ram_ranges. This second point answers whether the counter is
+still sane immediately after the page structures are built, or whether pmap_startup itself corrupts it.
 """
 import io
 import sys
 
-SRC = sys.argv[1] if len(sys.argv) > 1 else '.cache/xnu-work/osfmk/arm/pmap/pmap.c'
-if not SRC.endswith('pmap.c'):
-    sys.exit(0)
-
+SRC = sys.argv[1] if len(sys.argv) > 1 else '.cache/xnu-work/osfmk/vm/vm_resident.c'
 src = io.open(SRC, encoding='utf-8').read()
 report = []
 
-DECL = '\n/* for the range panic */\nextern unsigned int vm_page_free_count;\nextern uint64_t max_mem;\n'
-if 'extern unsigned int vm_page_free_count' not in src:
-    hdr = '#include <vm/vm_page.h>'
-    if hdr in src:
-        src = src.replace(hdr, hdr + DECL, 1)
+if SRC.endswith('vm_resident.c'):
+    DECL = '\n/* for the post-startup probe */\nextern void nabu_mark_text(const char *s, unsigned int y);\n'
+    ANCHOR = '\tpmap_startup(&virtual_space_start, &virtual_space_end);'
+    INJECT = (
+        '\tpmap_startup(&virtual_space_start, &virtual_space_end);\n'
+        '\t{\n'
+        '\t\tchar __b[96];\n'
+        '\t\tsnprintf(__b, sizeof(__b), "A fp=%u pg=%u",\n'
+        '\t\t    vm_page_free_count, (unsigned int)atop_64(max_mem));\n'
+        '\t\tpanic ("%s", __b);\n'
+        '\t}'
+    )
+    if 'A fp=%u pg=%u' in src:
+        report.append('  skip   post-startup probe already present')
+    elif ANCHOR in src:
+        src = src.replace(ANCHOR, INJECT, 1)
+        report.append('  insert post-startup probe')
     else:
-        src = DECL + src
-    report.append('  insert declarations')
+        report.append('  MISS   pmap_startup call anchor')
+    io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 
-ANCHOR = 'avail_page_count = atop(end - first);'
-INJECT = (
-    'avail_page_count = atop(end - first);\n'
-    '\t{\n'
-    '\t\tchar __b[192];\n'
-    '\t\tsnprintf(__b, sizeof(__b), "V2 fp=%u mm=%llu pg=%u",\n'
-    '\t\t    vm_page_free_count, (unsigned long long)(max_mem >> 20), avail_page_count);\n'
-    '\t\tpanic ("%s", __b);\n'
-    '\t}'
-)
-
-if 'freepg=%u' in src:
-    report.append('  skip   already extended')
-elif ANCHOR in src:
-    src = src.replace(ANCHOR, INJECT, 1)
-    report.append('  insert extended range panic')
+elif SRC.endswith('pmap.c'):
+    ANCHOR = 'avail_page_count = atop(end - first);'
+    INJECT = (
+        'avail_page_count = atop(end - first);\n'
+        '\t{\n'
+        '\t\tchar __b[96];\n'
+        '\t\tsnprintf(__b, sizeof(__b), "V2 fp=%u mm=%llu pg=%u",\n'
+        '\t\t    vm_page_free_count, (unsigned long long)(max_mem >> 20), avail_page_count);\n'
+        '\t\tpanic ("%s", __b);\n'
+        '\t}'
+    )
+    if 'V2 fp=%u' in src:
+        report.append('  skip   pmap probe already present')
+    elif ANCHOR in src:
+        src = src.replace(ANCHOR, INJECT, 1)
+        report.append('  insert pmap probe')
+    else:
+        report.append('  MISS   avail_page_count anchor')
+    io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 else:
-    report.append('  MISS   anchor')
+    report.append('  skip   unknown file')
 
-io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
