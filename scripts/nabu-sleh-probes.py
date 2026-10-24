@@ -55,6 +55,19 @@ elif JT_ANCHOR in src:
 else:
     report.append('  MISS   recover_esr anchor')
 
+# paint the facts at the unconditional panic
+PANIC_ANCHOR = '\tpanic_with_thread_kernel_state("Kernel data abort.", state);'
+if 'nabu_mark_num ("R2"' in src:
+    report.append('  skip   R2 present')
+elif PANIC_ANCHOR in src:
+    src = src.replace(PANIC_ANCHOR,
+        '\tnabu_mark_num ("R2", (unsigned long)recover, 2300);\n'
+        '\tnabu_mark_num ("FC", (unsigned long)fault_code, 2380);\n'
+        + PANIC_ANCHOR, 1)
+    report.append('  insert R2/FC')
+else:
+    report.append('  MISS   panic anchor')
+
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 
 print('\n'.join(report))
