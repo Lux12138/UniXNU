@@ -176,6 +176,9 @@ fi
 if [ -f "$ROOT/scripts/nabu-reason-probes.py" ]; then
   python3 "$ROOT/scripts/nabu-reason-probes.py" .cache/xnu-work/bsd/kern/sys_reason.c | tail -3
 fi
+if [ -f "$ROOT/scripts/nabu-panic-log.py" ]; then
+  python3 "$ROOT/scripts/nabu-panic-log.py" .cache/xnu-work/osfmk/console/serial_general.c .cache/xnu-work/osfmk/kern/debug.c | tail -4
+fi
 if [ -f "$ROOT/scripts/nabu-mem-probes.py" ]; then
   : python3 "$ROOT/scripts/nabu-mem-probes.py" .cache/xnu-work/osfmk/arm/pmap/pmap.c | tail -4
 fi

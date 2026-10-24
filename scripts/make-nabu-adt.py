@@ -134,7 +134,7 @@ def main():
                         # 4864 MiB matches owned_memory_size = 0x130000000 exactly.
                         ('boot-args', b'-enable_kprintf_spam native-ufs-root=1 native-ufs-diagnostics=1 maxmem=4864 '
                             b'amfi_get_out_of_my_way=1 cs_enforcement_disable=1 '
-                            b'amfi_allow_any_signature=1\0'),
+                            b'amfi_allow_any_signature=1 sheng-log=1 nabu-panic-restart=1\0'),
                         ('osenvironment', b'main\0'),
                         *([('certificate-production-status', struct.pack('<I', 0)), ('effective-production-status-ap', struct.pack('<I', 0)),
                            ('certificate-security-mode', struct.pack('<I', 1)), ('effective-security-mode-sep', struct.pack('<I', 1))]
