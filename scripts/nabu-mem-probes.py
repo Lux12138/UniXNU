@@ -34,7 +34,7 @@ INJECT = (
     '\t{\n'
     '\t\tchar __b[192];\n'
     '\t\tsnprintf(__b, sizeof(__b),'
-    ' "NABU-RANGE end=%llx first=%llx pages=%u freepg=%u maxmem=%llu",\n'
+    ' "NABU-RANGE-V2 end=%llx first=%llx pages=%u freepg=%u maxmem=%llu",\n'
     '\t\t    (unsigned long long)end, (unsigned long long)first, avail_page_count,\n'
     '\t\t    vm_page_free_count, (unsigned long long)(max_mem >> 20));\n'
     '\t\tpanic ("%s", __b);\n'
