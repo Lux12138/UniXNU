@@ -4,7 +4,7 @@ import io
 import sys
 
 SRC = sys.argv[1] if len(sys.argv) > 1 else '.cache/xnu-work/bsd/kern/kern_sig.c'
-if not SRC.endswith('kern_sig.c'):
+if not (SRC.endswith('kern_sig.c') or SRC.endswith('kern_exec.c')):
     sys.exit(0)
 
 src = io.open(SRC, encoding='utf-8').read()
@@ -46,6 +46,21 @@ elif ANCHOR in src:
     report.append('  insert AM/CS/NS/CD')
 else:
     report.append('  MISS   initproc guard anchor')
+
+# paint the reason at the delivery point
+PS_ANCHOR = 'psignal_with_reason(current_proc(), SIGKILL, exec_failure_reason);'
+if 'nabu_mark_num ("PN"' in src:
+    report.append('  skip   PN present')
+elif PS_ANCHOR in src:
+    src = src.replace(PS_ANCHOR,
+        'nabu_mark_num ("PN", exec_failure_reason'
+        ' ? (unsigned long)exec_failure_reason->osr_namespace : 7777, 2100);\n'
+        '\t\t\tnabu_mark_num ("PC2", exec_failure_reason'
+        ' ? (unsigned long)exec_failure_reason->osr_code : 7777, 2180);\n'
+        '\t\t\t' + PS_ANCHOR, 1)
+    report.append('  insert PN/PC2 at the exec SIGKILL')
+else:
+    report.append('  MISS   exec SIGKILL anchor')
 
 io.open(SRC, 'w', encoding='utf-8', newline='').write(src)
 print('\n'.join(report))
