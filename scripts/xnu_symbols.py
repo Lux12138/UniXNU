@@ -30,12 +30,21 @@ def kernel_names(root, global_only=True):
         print('warning: link.filelist missing, using empty kernel symbol set', flush=True)
         return set()
     # Objects listed here may already be gone: a per-object flag change deletes the stale object,
-    # and the list is only rewritten on the next full link. Keep the ones that still exist.
+    # and the list is only rewritten on the next full link. The remaining ones are then an
+    # incomplete picture of the kernel -- debug.o alone defines _panic, so the archive builders
+    # would reject (or, worse, fail to isolate) a build that is about to recompile exactly those
+    # objects. Fall back to the kernel this tree linked last, which has the same names.
     entries = [line.strip() for line in filelist.read_text().splitlines() if line.strip()]
     present = [entry for entry in entries if Path(entry).is_file()]
     if len(present) != len(entries):
-        print('warning: %d of %d objects in link.filelist are gone; using the rest'
+        previous = root.parent / 'kernel' / 'kernel.macho'
+        if previous.is_file():
+            print('warning: %d of %d objects in link.filelist are gone; using the previously linked kernel'
+                  % (len(entries) - len(present), len(entries)), flush=True)
+            return defined_names([previous], global_only)
+        print('warning: %d of %d objects in link.filelist are gone; using an empty kernel symbol set'
               % (len(entries) - len(present), len(entries)), flush=True)
+        return set()
     if not present:
         return set()
     names = defined_names(present, global_only)
